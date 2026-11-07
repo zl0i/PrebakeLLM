@@ -1,0 +1,13 @@
+models/
+third_party/
+bench/logs/
+build/
+cache/
+__pycache__/
+*.pyc
+.venv/
+*.md
+*.exe
+*.lib
+*.exp
+*.obj
