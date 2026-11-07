@@ -12,3 +12,5 @@ __pycache__/
 *.exp
 *.obj
 data/
+bench/prof/
+/build_*.log

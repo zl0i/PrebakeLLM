@@ -113,6 +113,8 @@ def main() -> None:
     ap.add_argument("--only", default="", help="comma-separated prompt ids")
     ap.add_argument("--port", type=int, default=8099)
     ap.add_argument("--ctx", type=int, default=20480)
+    ap.add_argument("--n-probs", type=int, default=0,
+                    help="store top-N token probabilities per generated token (for correctness analysis; slows generation)")
     ap.add_argument("server_args", nargs=argparse.REMAINDER)
     a = ap.parse_args()
     extra = [x for x in a.server_args if x != "--"]
@@ -157,12 +159,18 @@ def main() -> None:
                     for p in prompts:
                         body = {"prompt": p["prompt"], "n_predict": a.n_predict, "temperature": 0, "top_k": 1,
                                 "ignore_eos": True, "cache_prompt": False, "return_tokens": True, "seed": 1}
+                        if a.n_probs:
+                            body["n_probs"] = a.n_probs
                         t0 = time.time()
                         r = post(base + "/completion", body)
                         wall = time.time() - t0
                         tm = r.get("timings", {})
                         rec = {"kind": "run", "id": p["id"], "rep": rep, "wall_s": wall, "timings": tm,
                                "tokens": r.get("tokens"), "content": r.get("content")}
+                        if a.n_probs:
+                            # per generated token: [(token_id, logprob), ...] top-N candidates
+                            rec["top"] = [[(t["id"], t["logprob"]) for t in step.get("top_logprobs", [])]
+                                          for step in r.get("completion_probabilities", [])]
                         log.write(json.dumps(rec, ensure_ascii=False) + "\n")
                         log.flush()
                         results.setdefault(p["id"], []).append(tm)

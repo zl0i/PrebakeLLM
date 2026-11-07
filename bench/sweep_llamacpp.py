@@ -66,6 +66,15 @@ STAGES = {
         ("cache7500_nomtp", "-ngl 99 -cmoe --moe-cache-mib 7500 -lm none"),
         ("ncmoe25_mtp2", f"-ngl 99 -ncmoe 25 -lm none -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
     ],
+    # around the best combo: a bit more cache (smaller compute buffer via -ub), threads
+    "combo2": [
+        ("cache7000_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 7000 -lm none -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("cache7000_mtp2_ub256", f"-ngl 99 -cmoe --moe-cache-mib 7000 -lm none -ub 256 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("cache7400_mtp2_ub128", f"-ngl 99 -cmoe --moe-cache-mib 7400 -lm none -ub 128 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("cache6500_mtp3", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
+        ("cache6500_mtp2_t16pin", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2 -t 16 -C 0xFFFF --cpu-strict 1"),
+        ("cache6500_mtp2_t6", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2 -t 6"),
+    ],
 }
 
 

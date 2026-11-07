@@ -81,6 +81,32 @@ static void gpu_benches() {
         for (int i = 0; i < 500; ++i) { read_kernel<<<1, 32>>>(d, 0, dout); CK(cudaStreamSynchronize(0)); }
         std::printf("launch+sync:     %6.2f us\n", secs(t1, clk::now()) * 1e6 / 500);
     }
+    // Zero-copy: a GPU kernel reads pinned host RAM directly over PCIe (no
+    // cudaMemcpy, no CPU involvement). If this is close to the memcpy speed, a
+    // GPU kernel can use an expert that lives in RAM without any CPU<->GPU
+    // round trip. Tested with the whole GPU and with only a few blocks (as if
+    // the rest of the GPU were busy with other work).
+    {
+        const size_t zb = 256ull << 20;
+        void* h = nullptr;
+        CK(cudaHostAlloc(&h, zb, cudaHostAllocMapped));
+        std::memset(h, 4, zb);
+        int4* dptr = nullptr;
+        CK(cudaHostGetDevicePointer((void**)&dptr, h, 0));
+        for (int blocks : {prop.multiProcessorCount * 8, prop.multiProcessorCount, 16, 4}) {
+            for (size_t sz : {2ull << 20, 64ull << 20}) {  // one expert (~2 MiB) vs bulk
+                const int iters = sz < (8ull << 20) ? 50 : 5;
+                read_kernel<<<blocks, 256>>>(dptr, sz / 16, dout);
+                CK(cudaEventRecord(e0));
+                for (int i = 0; i < iters; ++i) read_kernel<<<blocks, 256>>>(dptr, sz / 16, dout);
+                CK(cudaEventRecord(e1)); CK(cudaEventSynchronize(e1));
+                float ms; CK(cudaEventElapsedTime(&ms, e0, e1));
+                std::printf("zero_copy_read blocks=%-4d %6zu KB: %6.2f GB/s  (%.1f us per read)\n",
+                            blocks, sz >> 10, (double)iters * sz / (ms * 1e6), ms * 1000 / iters);
+            }
+        }
+        CK(cudaFreeHost(h));
+    }
     // PCIe host->device, pinned (page-locked) and pageable host memory
     for (int pinned = 1; pinned >= 0; --pinned) {
         for (size_t sz : {64ull << 10, 1ull << 20, 8ull << 20, 256ull << 20}) {
