@@ -88,7 +88,7 @@ python tools/cachesim.py <eval.bin> [--calib <calib.bin>] [--mib 5500 6500 7500]
 ## Текущая картина (подробности и цифры — в DECISIONS.md и BENCHMARKS.md)
 
 - **Эталон для вехи:** лучший llama.cpp — `-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 8 -md models/mtp-Qwen3.6-35B-A3B-Q4_0.gguf --spec-type draft-mtp --spec-draft-n-max 3`. Даёт 106 / 109 ток/с; шум между запусками ±3 ток/с.
-- **Движок:** форк `third_party/llama-fork` (ветка `engine` — git worktree от `third_party/llama.cpp`), патчи — в `engine/patches/`. Сборка: `toolsuild_llamacpp.bat third_party\llama-fork build\llama-fork`. Включается переменными окружения:
+- **Движок:** форк `third_party/llama-fork` (ветка `engine` — git worktree от `third_party/llama.cpp`), патчи — в `engine/patches/`. Сборка: `tools\build_llamacpp.bat third_party\llama-fork build\llama-fork`. Включается переменными окружения:
   - `LLAMA_MOE_ZC_MIB` — VRAM под кэш экспертов;
   - `LLAMA_MOE_ZC_THREADS` — CPU-потоки, считающие экспертов;
   - эксперты должны лежать в RAM (`-cmoe`), а собственный пул llama — `-t 1`.
