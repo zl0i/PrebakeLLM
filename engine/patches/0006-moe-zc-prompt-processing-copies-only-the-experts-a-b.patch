@@ -1,0 +1,58 @@
+From ffeb4c69470e5e6189c19fea3438022efe4047ac Mon Sep 17 00:00:00 2001
+From: Dmitri <d.popov@posteam.top>
+Date: Sat, 7 Nov 2026 23:57:13 +0300
+Subject: [PATCH 6/6] moe-zc: prompt processing copies only the experts a batch
+ uses (PCIe traffic -25%, pp 590 -> 766 tok/s on Qwen3.6)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ ggml/src/ggml-cuda/moe-zc.cu | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/ggml/src/ggml-cuda/moe-zc.cu b/ggml/src/ggml-cuda/moe-zc.cu
+index 446d92029..e4f50e0d7 100644
+--- a/ggml/src/ggml-cuda/moe-zc.cu
++++ b/ggml/src/ggml-cuda/moe-zc.cu
+@@ -548,17 +548,30 @@ void ggml_cuda_moe_zc_to_vram(ggml_cuda_moe_zc * m, int ti, void * dst, const in
+             table, ids, m->n_used, (int) (ids_nb1 / sizeof(int32_t)), n_tokens);
+         return;
+     }
++    // which experts does this batch use? Even 512 tokens leave a part of the experts unused (routing is
++    // skewed), and copying only the used ones saves ~25% of the PCIe traffic. The ids are produced by the
++    // GPU just before: wait for them (one sync per call; prompt processing is not captured in a CUDA graph).
++    std::vector<int32_t> h_ids((size_t) n_tokens * m->n_used);
++    CUDA_CHECK(cudaMemcpy2DAsync(h_ids.data(), m->n_used * sizeof(int32_t), ids, ids_nb1, m->n_used * sizeof(int32_t), n_tokens,
++        cudaMemcpyDeviceToHost, stream));
++    CUDA_CHECK(cudaStreamSynchronize(stream));
++    std::vector<uint8_t> used(m->n_expert, 0);
++    for (int32_t e : h_ids) {
++        if (e >= 0 && e < m->n_expert) used[e] = 1;
++    }
++
+     std::vector<void *> dsts;
+     std::vector<const void *> srcs;
+     std::vector<size_t> sizes;
+     for (int e = 0; e < m->n_expert; ++e) {
++        if (!used[e]) continue;  // never read by this batch: garbage in dst is fine
+         const void * cached = m->h_tables[(size_t) ti * m->n_expert + e]; // published table (unchanged during a step)
+         const void * src = cached ? cached : (const void *) ((const char *) z.t->data + (size_t) e * z.expert_stride);
+         char * d = (char *) dst + (size_t) e * z.expert_stride;
+         // merge runs of consecutive host experts into one copy
+         if (!cached && !srcs.empty() && sizes.back() % z.expert_stride == 0 &&
+             (const char *) srcs.back() + sizes.back() == (const char *) src && (char *) dsts.back() + sizes.back() == d &&
+-            !m->h_tables[(size_t) ti * m->n_expert + e - 1]) {
++            used[e - 1] && !m->h_tables[(size_t) ti * m->n_expert + e - 1]) {
+             sizes.back() += z.expert_stride;
+             continue;
+         }
+@@ -566,6 +579,7 @@ void ggml_cuda_moe_zc_to_vram(ggml_cuda_moe_zc * m, int ti, void * dst, const in
+         srcs.push_back(src);
+         sizes.push_back(z.expert_stride);
+     }
++    if (dsts.empty()) return;
+     cudaMemcpyAttributes attr = {};
+     attr.srcAccessOrder = cudaMemcpySrcAccessOrderStream;
+     size_t attr_idx = 0;
+-- 
+2.45.2.windows.1
+

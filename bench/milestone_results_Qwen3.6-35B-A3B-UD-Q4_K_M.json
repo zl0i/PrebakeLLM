@@ -1,82 +1,82 @@
 {
  "llama.cpp cache6500+mtp3": [
   {
-   "short": 101.60643758602177,
-   "long": 105.30058361299929,
-   "pp_long": 636.1743503055062,
+   "short": 98.00353130601795,
+   "long": 100.17190284189653,
+   "pp_long": 607.4558228045304,
    "acc": 0.7009321964686948,
-   "cpu_busy": 0.06575,
-   "gpu_w": 114.0375,
-   "log": "20261107-225437_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp3_r0.jsonl"
+   "cpu_busy": 0.069875,
+   "gpu_w": 79.5,
+   "log": "20261108-000635_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp3_r0.jsonl"
   },
   {
-   "short": 104.93719821808489,
-   "long": 106.06482848693322,
-   "pp_long": 677.0817220688776,
+   "short": 98.53073840105819,
+   "long": 100.56176562798849,
+   "pp_long": 609.5721718938746,
    "acc": 0.7009321964686948,
-   "cpu_busy": 0.0745,
-   "gpu_w": 118.9875,
-   "log": "20261107-225926_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp3_r1.jsonl"
+   "cpu_busy": 0.067125,
+   "gpu_w": 80.875,
+   "log": "20261108-001035_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp3_r1.jsonl"
   }
  ],
- "llama.cpp ourtoolchain cache6500+mtp3": [
+ "llama.cpp cache6500+mtp2": [
   {
-   "short": 105.38994531485154,
-   "long": 106.27231718660919,
-   "pp_long": 669.0086589325773,
-   "acc": 0.7009321964686948,
-   "cpu_busy": 0.070125,
-   "gpu_w": 118.8,
-   "log": "20261107-225548_ms_Qwen3.6-35B-_llama_cpp_ourtoolchain_cache6500_mtp3_r0.jsonl"
+   "short": 96.99709515401678,
+   "long": 100.49558115018176,
+   "pp_long": 606.786319154945,
+   "acc": 0.7859026443487261,
+   "cpu_busy": 0.07125000000000001,
+   "gpu_w": 79.725,
+   "log": "20261108-000739_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_r0.jsonl"
   },
   {
-   "short": 105.46655345497342,
-   "long": 107.09529423277142,
-   "pp_long": 672.5838767472483,
-   "acc": 0.7009321964686948,
-   "cpu_busy": 0.07225000000000001,
-   "gpu_w": 120.075,
-   "log": "20261107-230027_ms_Qwen3.6-35B-_llama_cpp_ourtoolchain_cache6500_mtp3_r1.jsonl"
+   "short": 96.71133339082235,
+   "long": 98.38551302257659,
+   "pp_long": 605.6894944487888,
+   "acc": 0.7859026443487261,
+   "cpu_busy": 0.061375,
+   "gpu_w": 78.1,
+   "log": "20261108-001139_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_r1.jsonl"
   }
  ],
- "ik_llama.cpp cache6500+mtp3": [
+ "ours with GLM's choice (no draft, cache max)": [
   {
-   "short": 81.90873319844141,
-   "long": 81.7566436853851,
-   "pp_long": 324.61466002765883,
-   "acc": 0.8759087574209756,
-   "cpu_busy": 0.08775,
-   "gpu_w": 106.3625,
-   "log": "20261107-225650_ms_Qwen3.6-35B-_ik_llama_cpp_cache6500_mtp3_r0.jsonl"
+   "short": 94.98607211286918,
+   "long": 89.11702848180231,
+   "pp_long": 881.4164877808323,
+   "acc": null,
+   "cpu_busy": 0.283375,
+   "gpu_w": 137.325,
+   "log": "20261108-000844_ms_Qwen3.6-35B-_ours_with_GLM_s_choice__no_draft__cache_max__r0.jsonl"
   },
   {
-   "short": 83.5892677072641,
-   "long": 82.98827822987299,
-   "pp_long": 255.5800475456143,
-   "acc": 0.8759087574209756,
-   "cpu_busy": 0.093625,
-   "gpu_w": 107.675,
-   "log": "20261107-230127_ms_Qwen3.6-35B-_ik_llama_cpp_cache6500_mtp3_r1.jsonl"
+   "short": 95.4828386228628,
+   "long": 89.67751963937681,
+   "pp_long": 881.9366437341868,
+   "acc": null,
+   "cpu_busy": 0.280875,
+   "gpu_w": 133.025,
+   "log": "20261108-001244_ms_Qwen3.6-35B-_ours_with_GLM_s_choice__no_draft__cache_max__r1.jsonl"
   }
  ],
  "ours (aic build)": [
   {
-   "short": 123.6158273093206,
-   "long": 131.6655694535879,
-   "pp_long": 597.8194816102397,
-   "acc": 0.7852491013278236,
-   "cpu_busy": 0.310125,
-   "gpu_w": 120.1,
-   "log": "20261107-225825_ms_Qwen3.6-35B-_ours__aic_build__r0.jsonl"
+   "short": 117.57303641392167,
+   "long": 129.3058860039309,
+   "pp_long": 798.1084220301583,
+   "acc": 0.7820086432619326,
+   "cpu_busy": 0.2735,
+   "gpu_w": 84.175,
+   "log": "20261108-000941_ms_Qwen3.6-35B-_ours__aic_build__r0.jsonl"
   },
   {
-   "short": 123.77088166591483,
-   "long": 130.6236021993941,
-   "pp_long": 604.5736773058981,
-   "acc": 0.7852491013278236,
-   "cpu_busy": 0.306125,
-   "gpu_w": 120.3125,
-   "log": "20261107-230314_ms_Qwen3.6-35B-_ours__aic_build__r1.jsonl"
+   "short": 118.23470895110339,
+   "long": 133.2763293921868,
+   "pp_long": 799.641302292176,
+   "acc": 0.7820086432619326,
+   "cpu_busy": 0.27225,
+   "gpu_w": 82.8375,
+   "log": "20261108-001340_ms_Qwen3.6-35B-_ours__aic_build__r1.jsonl"
   }
  ]
 }

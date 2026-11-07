@@ -1,82 +1,82 @@
 {
  "llama.cpp cache8000 t6": [
   {
-   "short": 67.56811750281634,
-   "long": 60.92831819204893,
-   "pp_long": 729.1922061556261,
+   "short": 60.46995063955063,
+   "long": 50.4345081211425,
+   "pp_long": 609.707299398303,
    "acc": null,
-   "cpu_busy": 0.0735,
-   "gpu_w": 111.4,
-   "log": "20261107-233540_ms_GLM-4.7-Flas_llama_cpp_cache8000_t6_r0.jsonl"
+   "cpu_busy": 0.059625,
+   "gpu_w": 72.9625,
+   "log": "20261108-001443_ms_GLM-4.7-Flas_llama_cpp_cache8000_t6_r0.jsonl"
   },
   {
-   "short": 69.49777099335395,
-   "long": 59.30548394321466,
-   "pp_long": 755.141547278043,
+   "short": 60.97647350845354,
+   "long": 52.36382632951755,
+   "pp_long": 609.6680979427559,
    "acc": null,
-   "cpu_busy": 0.05925,
-   "gpu_w": 114.9375,
-   "log": "20261107-234007_ms_GLM-4.7-Flas_llama_cpp_cache8000_t6_r1.jsonl"
+   "cpu_busy": 0.057,
+   "gpu_w": 75.2625,
+   "log": "20261108-001937_ms_GLM-4.7-Flas_llama_cpp_cache8000_t6_r1.jsonl"
   }
  ],
- "llama.cpp cache7500 t8": [
+ "llama.cpp ncmoe47 cache7400+mtp1 (MTP layer on GPU)": [
   {
-   "short": 64.84526583550445,
-   "long": 56.079822479871744,
-   "pp_long": 733.6054642930499,
-   "acc": null,
-   "cpu_busy": 0.0595,
-   "gpu_w": 110.5375,
-   "log": "20261107-233647_ms_GLM-4.7-Flas_llama_cpp_cache7500_t8_r0.jsonl"
+   "short": 67.15279312838173,
+   "long": 53.840881824965194,
+   "pp_long": 577.5723070518644,
+   "acc": 0.8049149056006187,
+   "cpu_busy": 0.059625,
+   "gpu_w": 70.75,
+   "log": "20261108-001605_ms_GLM-4.7-Flas_llama_cpp_ncmoe47_cache7400_mtp1__MTP_layer_on_GPU__r0.jsonl"
   },
   {
-   "short": 64.7768422771592,
-   "long": 56.35133710673673,
-   "pp_long": 733.1065744866424,
-   "acc": null,
-   "cpu_busy": 0.058125,
-   "gpu_w": 111.1875,
-   "log": "20261107-234113_ms_GLM-4.7-Flas_llama_cpp_cache7500_t8_r1.jsonl"
+   "short": 66.17940972105917,
+   "long": 54.21675603926824,
+   "pp_long": 576.8244117718273,
+   "acc": 0.8049149056006187,
+   "cpu_busy": 0.05625,
+   "gpu_w": 70.6125,
+   "log": "20261108-002054_ms_GLM-4.7-Flas_llama_cpp_ncmoe47_cache7400_mtp1__MTP_layer_on_GPU__r1.jsonl"
   }
  ],
- "llama.cpp cache7500+mtp1": [
+ "ours with Qwen's choice (draft 2)": [
   {
-   "short": 69.83805450807762,
-   "long": 58.81159072668063,
-   "pp_long": 697.8920657468296,
-   "acc": 0.8063300156462352,
-   "cpu_busy": 0.34325,
-   "gpu_w": 103.8,
-   "log": "20261107-233757_ms_GLM-4.7-Flas_llama_cpp_cache7500_mtp1_r0.jsonl"
+   "short": 61.39989923320617,
+   "long": 52.308346832647544,
+   "pp_long": 683.4908132074768,
+   "acc": 0.5832316472446227,
+   "cpu_busy": 0.27575,
+   "gpu_w": 91.6375,
+   "log": "20261108-001721_ms_GLM-4.7-Flas_ours_with_Qwen_s_choice__draft_2__r0.jsonl"
   },
   {
-   "short": 69.72742319864335,
-   "long": 59.139595420229725,
-   "pp_long": 696.513501559334,
-   "acc": 0.8063300156462352,
-   "cpu_busy": 0.341625,
-   "gpu_w": 104.1375,
-   "log": "20261107-234222_ms_GLM-4.7-Flas_llama_cpp_cache7500_mtp1_r1.jsonl"
+   "short": 62.42903993015095,
+   "long": 52.345896759111575,
+   "pp_long": 685.0282272431599,
+   "acc": 0.5832316472446227,
+   "cpu_busy": 0.27775,
+   "gpu_w": 99.425,
+   "log": "20261108-002209_ms_GLM-4.7-Flas_ours_with_Qwen_s_choice__draft_2__r1.jsonl"
   }
  ],
  "ours (aic build)": [
   {
-   "short": 85.66947225929067,
-   "long": 70.80184617896319,
-   "pp_long": 705.9371132410685,
+   "short": 86.61421070753221,
+   "long": 70.7234762003022,
+   "pp_long": 743.1072803931058,
    "acc": null,
-   "cpu_busy": 0.2945,
-   "gpu_w": 123.4375,
-   "log": "20261107-233905_ms_GLM-4.7-Flas_ours__aic_build__r0.jsonl"
+   "cpu_busy": 0.27637500000000004,
+   "gpu_w": 122.375,
+   "log": "20261108-001837_ms_GLM-4.7-Flas_ours__aic_build__r0.jsonl"
   },
   {
-   "short": 86.26114196554786,
-   "long": 70.51070767311346,
-   "pp_long": 706.7773227860565,
+   "short": 86.63235148049671,
+   "long": 71.24787723236363,
+   "pp_long": 743.2574516011598,
    "acc": null,
-   "cpu_busy": 0.278875,
-   "gpu_w": 124.3,
-   "log": "20261107-234330_ms_GLM-4.7-Flas_ours__aic_build__r1.jsonl"
+   "cpu_busy": 0.27587500000000004,
+   "gpu_w": 123.1875,
+   "log": "20261108-002325_ms_GLM-4.7-Flas_ours__aic_build__r1.jsonl"
   }
  ]
 }

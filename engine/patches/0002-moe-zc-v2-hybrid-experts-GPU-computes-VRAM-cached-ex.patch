@@ -1,7 +1,7 @@
 From 187eb60283eb19acf272f4c4a3705d6854da925a Mon Sep 17 00:00:00 2001
 From: Dmitri <d.popov@posteam.top>
 Date: Sat, 7 Nov 2026 21:31:36 +0300
-Subject: [PATCH 2/5] moe-zc v2: hybrid experts - GPU computes VRAM-cached
+Subject: [PATCH 2/6] moe-zc v2: hybrid experts - GPU computes VRAM-cached
  experts, CPU workers compute the rest in parallel via pinned mailboxes; async
  batched uploads after graph launch; prefill warm-up
 

@@ -1,7 +1,7 @@
 From 5c93efb9df3693916242d0bd1c24253296f3306a Mon Sep 17 00:00:00 2001
 From: Dmitri <d.popov@posteam.top>
 Date: Sat, 7 Nov 2026 23:17:08 +0300
-Subject: [PATCH 5/5] moe-zc: CPU workers sleep when idle (no CPU load while
+Subject: [PATCH 5/6] moe-zc: CPU workers sleep when idle (no CPU load while
  the server waits)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

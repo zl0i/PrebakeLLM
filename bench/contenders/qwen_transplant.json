@@ -1,0 +1,5 @@
+[
+ {"name": "llama.cpp cache6500+mtp3", "server": "", "args": ["-ngl","99","-cmoe","-lm","none","-t","8","--moe-cache-mib","6500","-md","models/mtp-Qwen3.6-35B-A3B-Q4_0.gguf","--spec-type","draft-mtp","--spec-draft-n-max","3"]},
+ {"name": "llama.cpp cache6500+mtp2", "server": "", "args": ["-ngl","99","-cmoe","-lm","none","-t","8","--moe-cache-mib","6500","-md","models/mtp-Qwen3.6-35B-A3B-Q4_0.gguf","--spec-type","draft-mtp","--spec-draft-n-max","2"]},
+ {"name": "ours with GLM's choice (no draft, cache max)", "ours_cfg": {"mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf", "draft_n": 0, "cpu_threads": 6, "ctx": 20480, "cache_mib": 7703}}
+]

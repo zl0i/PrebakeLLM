@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 «Компилятор» запуска LLM под конкретное железо: найти и сохранить самый быстрый способ запуска модели на этой машине без потери качества. Постановка задачи — `ТЗ для Claude Code «компилятор» запуска LLM под конкретное железо.md`, прочитай её целиком перед содержательной работой.
 
-**Веха 1 достигнута (2026-11-07):** на Qwen3.6-35B-A3B (UD-Q4_K_M), RTX 4070 SUPER 12 ГБ + 64 ГБ RAM наш движок даёт 124.1 / 130.9 ток/с (short / long 17K) против 106.0 / 108.9 у лучшего llama.cpp. Корректность подтверждена (BENCHMARKS.md, «ИТОГ ВЕХИ 1»). Движок — форк llama.cpp «moe-zc» (гибридные эксперты GPU+CPU, DECISIONS.md D6), «компилятор» — `aic.py`. Дальнейшие направления — DECISIONS.md D7.
+**Веха 1 достигнута (2026-11-07):** на Qwen3.6-35B-A3B (UD-Q4_K_M), RTX 4070 SUPER 12 ГБ + 64 ГБ RAM наш движок даёт 124.1 / 130.9 ток/с (short / long 17K) против 106.0 / 108.9 у лучшего llama.cpp. Корректность подтверждена (BENCHMARKS.md, «ИТОГ ВЕХИ 1»). Движок — форк llama.cpp «moe-zc» (гибридные эксперты GPU+CPU, DECISIONS.md D6), «компилятор» — `aic.py`. Вторая модель GLM-4.7-Flash: +30%/+31% к лучшему llama.cpp, aic выбирает для неё другие настройки (без MTP), D8. Дальнейшие направления — DECISIONS.md D8. После перезагрузки 2026-11-08 машина медленнее (схема питания «Сбалансированная», фон): сравнивать только участников внутри одного прогона.
 
 ## Документы и правила работы (из ТЗ)
 
@@ -95,7 +95,7 @@ python tools/cachesim.py <eval.bin> [--calib <calib.bin>] [--mib 5500 6500 7500]
 
   Код — `ggml/src/ggml-cuda/moe-zc.cu` (менеджер, почта GPU↔CPU, CPU-потоки), хуки в `mmvq.cu` и `mmq.cu`, `src/llama-moe-zc.cpp`.
 - **Компилятор:** `python aic.py build|run|show --model <gguf>`, профили — в `cache/`.
-- **Итоговые замеры:** `python bench/milestone.py`, `bash bench/quality.sh`.
+- **Итоговые замеры:** `python bench/milestone.py [--model M] [--contenders F]` (участники — `bench/contenders/*.json`, в т.ч. «наш движок с заданной конфигурацией» через `ours_cfg`), `MODEL=… bash bench/quality.sh`. Промпты для новой модели — `bench/make_model_prompts.py` (шаблон чата из GGUF, при его отсутствии — `bench/templates/`). ik_llama.cpp: `tools/build_ik.bat`, сервер запускать через `serverbench.py --plain`, вместо `-lm none` — `-nmm`.
 - **Важные грабли:**
   - на WDDM вызовы CUDA API из второго потока задерживают запуск графа в основном потоке — копировать пакетом и после запуска графа;
   - CUDA-графы переигрывают решения, принятые на хосте при записи;

@@ -1,7 +1,7 @@
 From d7980ebfea02d70013321a13775ea3797cb7d1ad Mon Sep 17 00:00:00 2001
 From: Dmitri <d.popov@posteam.top>
 Date: Sat, 7 Nov 2026 21:45:47 +0300
-Subject: [PATCH 3/5] moe-zc: prompt processing on VRAM copies of the experts
+Subject: [PATCH 3/6] moe-zc: prompt processing on VRAM copies of the experts
  (gather kernel for small batches, cache-aware DMA batch for large)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

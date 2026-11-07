@@ -1,0 +1,289 @@
+{
+ "model": "D:\\Projects\\Work\\ai\\models\\GLM-4.7-Flash-MTP-Q4_K_M.gguf",
+ "model_fingerprint": "3e57fdfa0919",
+ "hardware": {
+  "gpu": "NVIDIA GeForce RTX 4070 SUPER",
+  "vram_mib": 12282,
+  "driver": "621.01",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-13700KF",
+  "ram_gib": 63
+ },
+ "engine": "81b3db29e110",
+ "built": "2026-11-07 23:35:30",
+ "build_seconds": 339,
+ "fixed_vram_mib": 2948,
+ "config": {
+  "mtp_file": "embedded",
+  "draft_n": 0,
+  "cpu_threads": 6,
+  "ctx": 20480,
+  "cache_mib": 7762
+ },
+ "expected_tg": 78.0,
+ "trials": [
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 0,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7762
+   },
+   "tg": 77.45091283998308,
+   "tg_all": [
+    73.48170166983701,
+    78.79131154827901,
+    76.36073386987555,
+    70.25860469062351,
+    79.54772863718232,
+    78.5410918100906
+   ],
+   "vram_free_before": 10935,
+   "vram_free_loaded": 698,
+   "load_s": 5.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 0,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7250
+   },
+   "tg": 75.34763599793538,
+   "tg_all": [
+    71.25475591885025,
+    76.43315776140261,
+    74.80818053331174,
+    67.86400395062404,
+    77.25924997303215,
+    75.88709146255903
+   ],
+   "vram_free_before": 10931,
+   "vram_free_loaded": 1209,
+   "load_s": 5.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 1,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7288
+   },
+   "tg": 59.54042319252396,
+   "tg_all": [
+    57.408556113433534,
+    58.72754040934942,
+    61.67277511584978,
+    55.110111041674685,
+    61.940249085504824,
+    60.35330597569849
+   ],
+   "vram_free_before": 10935,
+   "vram_free_loaded": 701,
+   "load_s": 6.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 1,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6776
+   },
+   "tg": 57.001643396461056,
+   "tg_all": [
+    56.02981208869625,
+    58.73164035994,
+    56.92353021833933,
+    53.62818265556643,
+    59.97354374617387,
+    57.07975657458278
+   ],
+   "vram_free_before": 10935,
+   "vram_free_loaded": 1209,
+   "load_s": 6.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7288
+   },
+   "tg": 57.77657252371463,
+   "tg_all": [
+    57.7515470331868,
+    57.80159801424245,
+    64.81956719281946,
+    56.42623883984814,
+    56.14476167608003,
+    63.17041590368855
+   ],
+   "vram_free_before": 10936,
+   "vram_free_loaded": 701,
+   "load_s": 6.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6776
+   },
+   "tg": 57.13920419170667,
+   "tg_all": [
+    56.2443821943728,
+    58.034026189040546,
+    58.2139733306777,
+    54.3502968927696,
+    54.07502961373085,
+    60.802408234252184
+   ],
+   "vram_free_before": 10935,
+   "vram_free_loaded": 1209,
+   "load_s": 6.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7288
+   },
+   "tg": 52.80008992769018,
+   "tg_all": [
+    55.35350173562819,
+    52.947564262192344,
+    55.01806253373749,
+    52.65261559318801,
+    46.02821384766051,
+    52.52702912078673
+   ],
+   "vram_free_before": 10936,
+   "vram_free_loaded": 701,
+   "load_s": 6.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6776
+   },
+   "tg": 49.87877224505182,
+   "tg_all": [
+    52.211741928196055,
+    45.448244025628235,
+    50.28855827763902,
+    50.4761744520081,
+    40.42800801542468,
+    49.46898621246463
+   ],
+   "vram_free_before": 10935,
+   "vram_free_loaded": 1209,
+   "load_s": 6.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 0,
+    "cpu_threads": 4,
+    "ctx": 20480,
+    "cache_mib": 7762
+   },
+   "tg": 76.02954534201959,
+   "tg_all": [
+    71.6066229370875,
+    77.80699754051591,
+    75.3355987711295,
+    68.59352641044899,
+    77.81903110901418,
+    76.72349191290968
+   ],
+   "vram_free_before": 10936,
+   "vram_free_loaded": 697,
+   "load_s": 5.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 0,
+    "cpu_threads": 6,
+    "ctx": 20480,
+    "cache_mib": 7762
+   },
+   "tg": 77.92789919292079,
+   "tg_all": [
+    73.02904259384462,
+    79.18413448752925,
+    77.30845978209712,
+    70.2995468110976,
+    79.5773093560394,
+    78.54733860374448
+   ],
+   "vram_free_before": 10935,
+   "vram_free_loaded": 697,
+   "load_s": 5.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 0,
+    "cpu_threads": 6,
+    "ctx": 20480,
+    "cache_mib": 7762
+   },
+   "tg": 78.15543767845031,
+   "tg_all": [
+    73.77789697728707,
+    79.47504483592152,
+    77.39896635870964,
+    70.6366225565393,
+    79.91744879377427,
+    78.91190899819098
+   ],
+   "vram_free_before": 10936,
+   "vram_free_loaded": 697,
+   "load_s": 5.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mtp_file": "embedded",
+    "draft_n": 0,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7762
+   },
+   "tg": 77.12328452116196,
+   "tg_all": [
+    73.62624539488672,
+    78.56841431150845,
+    76.8724236859892,
+    70.10575828416377,
+    78.92495279394333,
+    77.37414535633471
+   ],
+   "vram_free_before": 10935,
+   "vram_free_loaded": 697,
+   "load_s": 5.6,
+   "ok": true
+  }
+ ]
+}

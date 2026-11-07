@@ -31,15 +31,16 @@ import aic  # noqa: E402
 DEFAULT_MODEL = ROOT / "models" / "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
 
 
-def ours(model):
-    prof = aic.load_profile(model)
-    cfg = prof["config"]
+def ours(model, cfg=None, name="ours (aic build)"):
+    """our engine with the saved aic build of the model, or with an explicit config (e.g. another model's choice)"""
+    if cfg is None:
+        cfg = aic.load_profile(model)["config"]
     args = aic.server_args(model, cfg)
     for flag in ("-m", "-c", "-np"):  # serverbench adds these itself
         i = args.index(flag)
         del args[i:i + 2]
     env = {"LLAMA_MOE_ZC_MIB": str(cfg["cache_mib"]), "LLAMA_MOE_ZC_THREADS": str(cfg.get("cpu_threads", 8))}
-    return {"name": "ours (aic build)", "server": str(aic.ENGINE), "args": args, "env": env}
+    return {"name": name, "server": str(aic.ENGINE), "args": args, "env": env}
 
 
 def run(tag, model, c):
@@ -83,9 +84,14 @@ def main():
     ap.add_argument("--model", default=str(DEFAULT_MODEL))
     ap.add_argument("--rounds", type=int, default=3)
     ap.add_argument("--only", default="", help="comma-separated contender names")
+    ap.add_argument("--contenders", default="", help="contenders file (default: bench/contenders/<model>.json)")
     a = ap.parse_args()
     model = pathlib.Path(a.model).resolve()
-    contenders = json.loads((ROOT / "bench" / "contenders" / f"{model.stem}.json").read_text(encoding="utf-8"))
+    cfile = pathlib.Path(a.contenders) if a.contenders else ROOT / "bench" / "contenders" / f"{model.stem}.json"
+    contenders = []
+    for c in json.loads(cfile.read_text(encoding="utf-8")):
+        # {"name": ..., "ours_cfg": {...}}: our engine with a fixed config (e.g. transplanted from another model)
+        contenders.append(ours(model, dict(c["ours_cfg"]), c["name"]) if "ours_cfg" in c else c)
     contenders.append(ours(model))
     if a.only:
         keep = set(a.only.split(","))

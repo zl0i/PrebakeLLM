@@ -1,0 +1,5 @@
+[
+ {"name": "llama.cpp cache8000 t6", "server": "", "args": ["-ngl","99","-cmoe","-lm","none","-t","6","--moe-cache-mib","8000"]},
+ {"name": "llama.cpp ncmoe47 cache7400+mtp1 (MTP layer on GPU)", "server": "", "args": ["-ngl","99","-ncmoe","47","-lm","none","-t","6","--moe-cache-mib","7400","--spec-type","draft-mtp","--spec-draft-n-max","1"]},
+ {"name": "ours with Qwen's choice (draft 2)", "ours_cfg": {"mtp_file": "embedded", "draft_n": 2, "cpu_threads": 6, "ctx": 20480, "cache_mib": 7288}}
+]
