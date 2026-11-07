@@ -79,11 +79,28 @@ def profile_path(model: pathlib.Path, hw: dict) -> pathlib.Path:
 
 # ---------------------------------------------------------------- measuring
 
+def find_draft(model: pathlib.Path):
+    """The model's own multi-token-prediction (MTP) head, if any:
+    "embedded" when the GGUF contains the MTP layer, else a sidecar file
+    mtp-<model base name>*.gguf next to it (as published by ggml-org), else None."""
+    sys.path.insert(0, str(ROOT / "third_party" / "llama.cpp" / "gguf-py"))
+    from gguf import GGUFReader
+    r = GGUFReader(str(model))
+    for k, f in r.fields.items():
+        if k.endswith(".nextn_predict_layers") and int(f.contents()) > 0:
+            return "embedded"
+    base = model.stem.split("-UD-")[0].split("-Q")[0]
+    side = sorted(model.parent.glob(f"mtp-{base}*.gguf"))
+    return side[0].name if side else None
+
+
 def server_args(model: pathlib.Path, cfg: dict) -> list:
     args = ["-m", str(model), "-ngl", "99", "-cmoe", "-lm", "none", "-t", "1", "-c", str(cfg.get("ctx", 20480)), "-np", "1"]
-    mtp = model.parent / cfg["mtp_file"] if cfg.get("mtp_file") else None
-    if mtp and cfg.get("draft_n", 0) > 0:
-        args += ["-md", str(mtp), "--spec-type", "draft-mtp", "--spec-draft-n-max", str(cfg["draft_n"])]
+    draft = cfg.get("mtp_file")
+    if draft and cfg.get("draft_n", 0) > 0:
+        if draft != "embedded":
+            args += ["-md", str(model.parent / draft)]
+        args += ["--spec-type", "draft-mtp", "--spec-draft-n-max", str(cfg["draft_n"])]
     return args
 
 
@@ -95,8 +112,9 @@ def server_env(cfg: dict) -> dict:
     return env
 
 
-def measure(model: pathlib.Path, cfg: dict, prompts: list, n_predict: int = 160) -> dict:
-    """Starts the engine with cfg, generates on the prompts, returns speed and free VRAM."""
+def measure(model: pathlib.Path, cfg: dict, prompts: list, n_predict: int = 160, passes: int = 2) -> dict:
+    """Starts the engine with cfg, warms it up, generates on the prompts `passes` times and
+    returns the median speed (robust to a single slow or fast run) and free VRAM."""
     port = 8097
     log = open(ROOT / "bench" / "logs" / "aic_build.server.log", "w", encoding="utf-8")
     env_backup = dict(os.environ)
@@ -115,11 +133,12 @@ def measure(model: pathlib.Path, cfg: dict, prompts: list, n_predict: int = 160)
         free1 = sb.vram_free_mib()
         sb.post(base + "/completion", {"prompt": prompts[0], "n_predict": 96, "temperature": 0, "ignore_eos": True})
         tg = []
-        for p in prompts:
-            r = sb.post(base + "/completion", {"prompt": p, "n_predict": n_predict, "temperature": 0, "top_k": 1,
-                                               "ignore_eos": True, "cache_prompt": False})
-            tg.append(r["timings"]["predicted_per_second"])
-        return {"tg": statistics.mean(tg), "tg_all": tg, "vram_free_before": free0, "vram_free_loaded": free1,
+        for _ in range(passes):
+            for p in prompts:
+                r = sb.post(base + "/completion", {"prompt": p, "n_predict": n_predict, "temperature": 0, "top_k": 1,
+                                                   "ignore_eos": True, "cache_prompt": False})
+                tg.append(r["timings"]["predicted_per_second"])
+        return {"tg": statistics.median(tg), "tg_all": tg, "vram_free_before": free0, "vram_free_loaded": free1,
                 "load_s": round(load_s, 1), "ok": True}
     except Exception as e:  # out of memory, crash...
         return {"ok": False, "error": str(e)}
@@ -134,9 +153,10 @@ def cmd_build(a):
     model = pathlib.Path(a.model).resolve()
     hw = hw_fingerprint()
     print(f"hardware: {hw}")
-    prompts = [p["prompt"] for p in json.loads((ROOT / "bench" / "calib_prompts.json").read_text(encoding="utf-8"))[:3]]
-    mtp = next(iter(sorted(model.parent.glob("mtp-*.gguf"))), None)
-    base = {"mtp_file": mtp.name if mtp else None, "draft_n": 2 if mtp else 0, "cpu_threads": 8, "ctx": a.ctx}
+    prompts = [p["prompt"] for p in json.loads(sb.prompts_path(str(model), calib=True).read_text(encoding="utf-8"))[:3]]
+    mtp = find_draft(model)
+    print(f"draft head: {mtp or 'none'}")
+    base = {"mtp_file": mtp, "draft_n": 2 if mtp else 0, "cpu_threads": 8, "ctx": a.ctx}
     t_start = time.time()
     trials = []
 
@@ -159,16 +179,30 @@ def cmd_build(a):
         print(f"  {cfg['cache_mib']:5d} MiB cache, draft {cfg['draft_n']}, {cfg['cpu_threads']} CPU threads -> "
               + (f"{r['tg']:.1f} tok/s, VRAM free {r['vram_free_loaded']} MiB" if r["ok"] else f"FAILED {r['error']}"), flush=True)
 
-    def best_so_far():
-        ok = [t for t in trials if t["ok"] and t["vram_free_loaded"] >= MARGIN_MIB // 2]
-        return max(ok, key=lambda t: t["tg"])
+    def key(cfg):
+        return json.dumps(cfg, sort_keys=True)
+
+    def ranked():
+        """configs by the median over all their runs (a config may have been measured several times)"""
+        runs = {}
+        for t in trials:
+            if t["ok"] and t["vram_free_loaded"] >= MARGIN_MIB // 2:
+                runs.setdefault(key(t["cfg"]), (t["cfg"], []))[1].extend(t["tg_all"])
+        return sorted(((statistics.median(v), c) for c, v in runs.values()), key=lambda x: -x[0])
 
     for cfg in grid:
         trial(cfg)
     # then the CPU threads that compute the experts not in VRAM, around the best so far
-    for n in (4, 5, 6):
-        trial(dict(best_so_far()["cfg"], cpu_threads=n))
-    best = best_so_far()
+    for n in (4, 6):
+        cfg = dict(ranked()[0][1], cpu_threads=n)
+        if key(cfg) not in {key(t["cfg"]) for t in trials}:
+            trial(cfg)
+    # the two finalists are measured once more (fresh engine start) and decided by the median of all their runs:
+    # a single short trial is noisy (+-10%), a lucky run must not decide the build
+    for _, cfg in ranked()[:2]:
+        trial(cfg)
+    score, best_cfg = ranked()[0]
+    best = {"cfg": best_cfg, "tg": score}
     prof = {
         "model": str(model), "model_fingerprint": model_fingerprint(model), "hardware": hw,
         "engine": engine_version(), "built": time.strftime("%Y-%m-%d %H:%M:%S"),

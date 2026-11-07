@@ -6,6 +6,12 @@ bench/sweep_results.csv, which is committed, so the baseline is reproducible.
 
   python bench/sweep_llamacpp.py placement
   python bench/sweep_llamacpp.py threads --base "-ngl 99 -ncmoe 25 -lm none"
+  python bench/sweep_llamacpp.py generic --model models/OTHER.gguf --draft embedded   (another model)
+  python bench/sweep_llamacpp.py ik --server build/ik/bin/llama-server.exe            (ik_llama.cpp)
+
+--draft replaces the Qwen3.6 MTP sidecar in the configs: a file path, "embedded"
+(MTP layer inside the model file), or "none". Results of other models go to
+bench/sweep_results_<model>.csv.
 
 Logical CPU layout on i7-13700KF under Windows: 0..15 = 8 P-cores x 2
 hyperthreads (0,1 = core 0 ...), 16..23 = 8 E-cores. -C takes a hex mask.
@@ -75,12 +81,46 @@ STAGES = {
         ("cache6500_mtp2_t16pin", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2 -t 16 -C 0xFFFF --cpu-strict 1"),
         ("cache6500_mtp2_t6", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2 -t 6"),
     ],
+    # compact search for a new model: placement, expert cache sizes, draft length (all on P-cores, no mmap)
+    "generic": [
+        ("fit", "-t 8"),
+        ("fit_lmnone", "-lm none -t 8"),
+        ("cache5500", "-ngl 99 -cmoe --moe-cache-mib 5500 -lm none -t 8"),
+        ("cache6500", "-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 8"),
+        ("cache7000", "-ngl 99 -cmoe --moe-cache-mib 7000 -lm none -t 8"),
+        ("cache6000_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 6000 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("cache6000_mtp3", f"-ngl 99 -cmoe --moe-cache-mib 6000 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
+        ("cache6500_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("cache6500_mtp3", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
+    ],
+    # ik_llama.cpp (fork tuned for hybrid CPU+GPU MoE): its own expert cache, merged up/gate experts, layer offload
+    # (MTP: ik loads its own way; spec options of ik are given via --spec-type mtp:n_max=N)
+    "ik": [
+        ("ik_ncmoe25", "-ngl 99 -ncmoe 25 -nmm -t 8"),
+        ("ik_ncmoe25_muge", "-ngl 99 -ncmoe 25 -nmm -t 8 -muge"),
+        ("ik_ncmoe25_mtp2", f"-ngl 99 -ncmoe 25 -nmm -t 8 -md {MTP} --spec-type mtp:n_max=2"),
+        ("ik_cache6000", "-ngl 99 -cmoe --moe-cache-mib 6000 -nmm -t 8"),
+        ("ik_cache6500", "-ngl 99 -cmoe --moe-cache-mib 6500 -nmm -t 8"),
+        ("ik_cache7000", "-ngl 99 -cmoe --moe-cache-mib 7000 -nmm -t 8"),
+        ("ik_cache6500_muge", "-ngl 99 -cmoe --moe-cache-mib 6500 -nmm -t 8 -muge"),
+        ("ik_cache6500_mtp1", f"-ngl 99 -cmoe --moe-cache-mib 6500 -nmm -t 8 -md {MTP} --spec-type mtp:n_max=1"),
+        ("ik_cache6500_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 6500 -nmm -t 8 -md {MTP} --spec-type mtp:n_max=2"),
+        ("ik_cache6500_mtp3", f"-ngl 99 -cmoe --moe-cache-mib 6500 -nmm -t 8 -md {MTP} --spec-type mtp:n_max=3"),
+        ("ik_cache6000_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 6000 -nmm -t 8 -md {MTP} --spec-type mtp:n_max=2"),
+        ("ik_cache6500_mtp2_t6", f"-ngl 99 -cmoe --moe-cache-mib 6500 -nmm -t 6 -md {MTP} --spec-type mtp:n_max=2"),
+    ],
 }
 
 
-def run(tag: str, args: str, only: str, reps: int) -> dict:
-    cmd = [sys.executable, str(ROOT / "bench" / "serverbench.py"), "--tag", tag, "--reps", str(reps),
-           "--only", only, "--"] + shlex.split(args)
+def run(tag: str, args: str, only: str, reps: int, model: str = "", server: str = "", plain: bool = False) -> dict:
+    cmd = [sys.executable, str(ROOT / "bench" / "serverbench.py"), "--tag", tag, "--reps", str(reps), "--only", only]
+    if plain:
+        cmd += ["--plain"]
+    if model:
+        cmd += ["--model", model]
+    if server:
+        cmd += ["--server", server]
+    cmd += ["--"] + shlex.split(args)
     p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     print(p.stdout[-1500:], p.stderr[-1500:] if p.returncode else "", flush=True)
     log = next((l.split("log: ", 1)[1].strip() for l in p.stdout.splitlines() if l.startswith("log: ")), None)
@@ -112,9 +152,21 @@ def main() -> None:
     ap.add_argument("--base", default="", help="args prepended to every config of the stage")
     ap.add_argument("--only", default="short0,short1")
     ap.add_argument("--reps", type=int, default=2)
+    ap.add_argument("--model", default="", help="model file (default: Qwen3.6-35B-A3B)")
+    ap.add_argument("--server", default="", help="server binary (default: official llama.cpp)")
+    ap.add_argument("--draft", default="", help='MTP draft for this model: file, "embedded" or "none"')
+    ap.add_argument("--tag-prefix", default="")
+    ap.add_argument("--plain", action="store_true", help="passed to serverbench (servers without --no-webui)")
     a = ap.parse_args()
 
-    out = ROOT / "bench" / "sweep_results.csv"
+    def adapt(args: str) -> str:
+        if not a.draft or MTP not in args:
+            return args
+        if a.draft == "none":
+            return ""   # config needs a draft the model does not have: skipped
+        return args.replace(f"-md {MTP}", "" if a.draft == "embedded" else f"-md {a.draft}")
+
+    out = ROOT / "bench" / ("sweep_results.csv" if not a.model else f"sweep_results_{pathlib.Path(a.model).stem}.csv")
     new = not out.exists()
     with open(out, "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -122,8 +174,12 @@ def main() -> None:
             w.writerow(["time", "stage", "tag", "args", "prompts", "tg_median_by_prompt", "tg_mean",
                         "pp_by_prompt", "draft_accept", "vram_free_loaded_mib", "load_s", "log"])
         for tag, args in STAGES[a.stage]:
+            args = adapt(args)
+            if not args:
+                continue
+            tag = a.tag_prefix + tag
             full = (a.base + " " + args).strip()
-            r = run(tag, full, a.only, a.reps)
+            r = run(tag, full, a.only, a.reps, a.model, a.server, a.plain)
             tg_mean = round(statistics.mean(r["tg"].values()), 2) if r.get("tg") else ""
             w.writerow([datetime.datetime.now().isoformat(timespec="seconds"), a.stage, tag, full, a.only,
                         json.dumps(r.get("tg")), tg_mean, json.dumps(r.get("pp")), json.dumps(r.get("acc")),

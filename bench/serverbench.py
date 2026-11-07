@@ -28,6 +28,63 @@ DEFAULT_SERVER = ROOT / "third_party" / "llama-bin" / "llama-server.exe"
 DEFAULT_MODEL = ROOT / "models" / "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
 
 
+def prompts_path(model: str, explicit: str = "", calib: bool = False) -> pathlib.Path:
+    """Prompts made with the model's own chat template (bench/make_model_prompts.py), if present."""
+    if explicit:
+        return pathlib.Path(explicit)
+    own = ROOT / "bench" / "prompts" / (pathlib.Path(model).stem + (".calib.json" if calib else ".json"))
+    if own.exists():
+        return own
+    return ROOT / "bench" / ("calib_prompts.json" if calib else "prompts.json")
+
+
+class PowerSampler:
+    """GPU board power and utilization sampled every 200 ms by a streaming nvidia-smi,
+    plus CPU busy time of the whole machine (all logical CPUs) via GetSystemTimes."""
+
+    def __init__(self):
+        import threading
+        self.samples = []
+        self.mark = 0
+        self.proc = subprocess.Popen(["nvidia-smi", "--query-gpu=power.draw,utilization.gpu", "--format=csv,noheader,nounits",
+                                      "-lms", "200"], stdout=subprocess.PIPE, text=True)
+        self.thread = threading.Thread(target=self._read, daemon=True)
+        self.thread.start()
+
+    def _read(self):
+        for line in self.proc.stdout:
+            try:
+                w, u = (float(x) for x in line.split(","))
+                self.samples.append((time.time(), w, u))
+            except ValueError:
+                pass
+
+    @staticmethod
+    def cpu_times():
+        if sys.platform != "win32":
+            return (0, 0)
+        import ctypes
+        idle, kern, user = (ctypes.c_ulonglong(), ctypes.c_ulonglong(), ctypes.c_ulonglong())
+        ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kern), ctypes.byref(user))
+        return (kern.value + user.value, idle.value)  # kernel time includes idle time
+
+    def start(self):
+        self.t0 = time.time()
+        self.c0 = self.cpu_times()
+
+    def stop(self) -> dict:
+        t1 = time.time()
+        c1 = self.cpu_times()
+        total, idle = c1[0] - self.c0[0], c1[1] - self.c0[1]
+        sel = [(w, u) for (t, w, u) in self.samples if self.t0 <= t <= t1]
+        return {"cpu_busy": round(1 - idle / total, 3) if total else None,
+                "gpu_w": round(statistics.mean(w for w, _ in sel), 1) if sel else None,
+                "gpu_util": round(statistics.mean(u for _, u in sel), 1) if sel else None}
+
+    def close(self):
+        self.proc.terminate()
+
+
 def vram_free_mib() -> int:
     out = subprocess.run(["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
                          capture_output=True, text=True).stdout
@@ -115,11 +172,13 @@ def main() -> None:
     ap.add_argument("--ctx", type=int, default=20480)
     ap.add_argument("--n-probs", type=int, default=0,
                     help="store top-N token probabilities per generated token (for correctness analysis; slows generation)")
+    ap.add_argument("--plain", action="store_true", help="do not add --no-webui/--metrics (servers that lack them, e.g. ik_llama.cpp)")
+    ap.add_argument("--prompts", default="", help="prompt file (default: bench/prompts/<model>.json, else bench/prompts.json)")
     ap.add_argument("server_args", nargs=argparse.REMAINDER)
     a = ap.parse_args()
     extra = [x for x in a.server_args if x != "--"]
 
-    prompts = json.loads((ROOT / "bench" / "prompts.json").read_text(encoding="utf-8"))
+    prompts = json.loads(prompts_path(a.model, a.prompts).read_text(encoding="utf-8"))
     warmup = next(p for p in prompts if p["id"] == "warmup")
     prompts = [p for p in prompts if p["id"] != "warmup"]
     if a.only:
@@ -132,9 +191,9 @@ def main() -> None:
     log_path = logdir / f"{stamp}_{a.tag}.jsonl"
     srv_log = logdir / f"{stamp}_{a.tag}.server.log"
 
-    cmd = [str(pathlib.Path(a.server).resolve()), "-m", str(pathlib.Path(a.model).resolve()), "--port", str(a.port), "-c", str(a.ctx), "-np", "1",
-           "--no-webui", "--metrics"] + extra
+    cmd = [str(pathlib.Path(a.server).resolve()), "-m", str(pathlib.Path(a.model).resolve()), "--port", str(a.port), "-c", str(a.ctx), "-np", "1"] + ([] if a.plain else ["--no-webui", "--metrics"]) + extra
     vram_before = vram_free_mib()
+    sampler = PowerSampler()
     t_start = time.time()
     with open(srv_log, "w", encoding="utf-8") as slog:
         proc = start_server(cmd, slog)
@@ -162,10 +221,12 @@ def main() -> None:
                         if a.n_probs:
                             body["n_probs"] = a.n_probs
                         t0 = time.time()
+                        sampler.start()
                         r = post(base + "/completion", body)
                         wall = time.time() - t0
+                        load = sampler.stop()  # includes prompt processing; dominated by generation for short prompts
                         tm = r.get("timings", {})
-                        rec = {"kind": "run", "id": p["id"], "rep": rep, "wall_s": wall, "timings": tm,
+                        rec = {"kind": "run", "id": p["id"], "rep": rep, "wall_s": wall, "timings": tm, "load": load,
                                "tokens": r.get("tokens"), "content": r.get("content")}
                         if a.n_probs:
                             # per generated token: [(token_id, logprob), ...] top-N candidates
@@ -178,12 +239,14 @@ def main() -> None:
                         if tm.get("draft_n"):
                             acc = f"  draft {tm['draft_n_accepted']}/{tm['draft_n']}"
                         print(f"  {p['id']:8s} rep{rep}: pp {tm.get('prompt_per_second', 0):8.1f} t/s"
-                              f" ({tm.get('prompt_n')} tok)  tg {tm.get('predicted_per_second', 0):6.2f} t/s{acc}")
+                              f" ({tm.get('prompt_n')} tok)  tg {tm.get('predicted_per_second', 0):6.2f} t/s{acc}"
+                              f"  | CPU busy {100 * (load['cpu_busy'] or 0):4.1f}%  GPU {load['gpu_w']} W")
             print(f"[{a.tag}] median tg t/s: " + ", ".join(
                 f"{k}={statistics.median(x['predicted_per_second'] for x in v):.2f}" for k, v in results.items()))
             print(f"log: {log_path}")
         finally:
             stop_server(proc)
+            sampler.close()
     # surface engine statistics printed at shutdown (e.g. MoE cache hit rate)
     for line in open(srv_log, encoding="utf-8", errors="replace"):
         if "llama_moe_cache:" in line:
