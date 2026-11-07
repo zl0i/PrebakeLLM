@@ -1,0 +1,328 @@
+From 2d6458b79ed53f07c71d5a21b85c82aab4897031 Mon Sep 17 00:00:00 2001
+From: Claude Agent <noreply@anthropic.com>
+Date: Sun, 8 Nov 2026 01:03:13 +0300
+Subject: [PATCH] moe-zc: CPU experts for any weight type (activations
+ quantized to each tensor's vec_dot type), fused gate_up, GELU, per-expert
+ gate/up scales, SwiGLU clamp; unsupported FFNs (biases, other activations)
+ disable moe-zc
+
+---
+ ggml/include/ggml-cuda.h        |   6 ++
+ ggml/src/ggml-cuda/ggml-cuda.cu |   6 ++
+ ggml/src/ggml-cuda/moe-zc.cu    | 107 +++++++++++++++++++++++++-------
+ src/llama-moe-zc.cpp            |  49 +++++++++++++++
+ 4 files changed, 145 insertions(+), 23 deletions(-)
+
+diff --git a/ggml/include/ggml-cuda.h b/ggml/include/ggml-cuda.h
+index 1158dfe5a..ee59ad1ec 100644
+--- a/ggml/include/ggml-cuda.h
++++ b/ggml/include/ggml-cuda.h
+@@ -49,6 +49,12 @@ GGML_BACKEND_API ggml_cuda_moe_zc * ggml_cuda_moe_zc_create(int device, int n_la
+ GGML_BACKEND_API void ggml_cuda_moe_zc_add_tensor(ggml_cuda_moe_zc * m, int layer, int role, const struct ggml_tensor * t); // role: 0 gate, 1 up, 2 down, 3 gate_up
+ GGML_BACKEND_API void ggml_cuda_moe_zc_start(ggml_cuda_moe_zc * m, int n_used);
+ GGML_BACKEND_API void ggml_cuda_moe_zc_launched(ggml_cuda_moe_zc * m);
++// how the CPU computes an expert, to match the model's compute graph (call before ggml_cuda_moe_zc_start):
++// act: 0 = SiLU(gate) * up, 1 = GELU(gate) * up (tanh approximation, as ggml_geglu);
++// per layer: clamp > 0 clamps up to [-clamp, clamp] and SiLU(gate) to <= clamp;
++// gate_s / up_s: per-expert output scales of the gate and up projections (n_expert floats) or NULL
++GGML_BACKEND_API void ggml_cuda_moe_zc_set_act(ggml_cuda_moe_zc * m, int act);
++GGML_BACKEND_API void ggml_cuda_moe_zc_set_layer(ggml_cuda_moe_zc * m, int layer, float clamp, const float * gate_s, const float * up_s);
+ GGML_BACKEND_API void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_tokens, int n_used);
+ GGML_BACKEND_API void ggml_cuda_moe_zc_free(ggml_cuda_moe_zc * m);
+ 
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index 0d6cb46d4..b25326601 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -6613,6 +6613,12 @@ static void * ggml_backend_cuda_reg_get_proc_address(ggml_backend_reg_t reg, con
+     if (strcmp(name, "ggml_cuda_moe_zc_start") == 0) {
+         return (void *)ggml_cuda_moe_zc_start;
+     }
++    if (strcmp(name, "ggml_cuda_moe_zc_set_act") == 0) {
++        return (void *)ggml_cuda_moe_zc_set_act;
++    }
++    if (strcmp(name, "ggml_cuda_moe_zc_set_layer") == 0) {
++        return (void *)ggml_cuda_moe_zc_set_layer;
++    }
+     if (strcmp(name, "ggml_cuda_moe_zc_launched") == 0) {
+         return (void *)ggml_cuda_moe_zc_launched;
+     }
+diff --git a/ggml/src/ggml-cuda/moe-zc.cu b/ggml/src/ggml-cuda/moe-zc.cu
+index e4f50e0d7..69829341e 100644
+--- a/ggml/src/ggml-cuda/moe-zc.cu
++++ b/ggml/src/ggml-cuda/moe-zc.cu
+@@ -156,7 +156,10 @@ struct ggml_cuda_moe_zc {
+ 
+     std::vector<zc_tensor> tensors;
+     std::vector<std::vector<int>> layer_tensors;  // layer -> tensor indices
+-    std::vector<int> layer_gate, layer_up, layer_down; // layer -> tensor index or -1
++    std::vector<int> layer_gate, layer_up, layer_down, layer_gate_up; // layer -> tensor index or -1
++    int act = 0;                                         // 0 = SiLU, 1 = GELU (see ggml_cuda_moe_zc_set_act)
++    std::vector<float> layer_clamp;                      // per layer, 0 = none
++    std::vector<std::vector<float>> scale_gate, scale_up; // per layer: [n_expert] or empty
+ 
+     // tables [tensor][expert]: host mirror (pinned) + device copy, nullptr = not in VRAM
+     const void ** h_tables = nullptr;
+@@ -190,8 +193,12 @@ struct ggml_cuda_moe_zc {
+     std::atomic<int> job_left{0};
+     std::atomic<uint32_t> barrier_count{0};
+     std::atomic<uint32_t> barrier_gen{0};
+-    const ggml_type_traits_cpu * tr_gate = nullptr;
+-    const ggml_type_traits_cpu * tr_q8   = nullptr;
++    // activations are quantized to the vec_dot type of each weight tensor (Q8_K for K/IQ quants, Q8_0 for
++    // Q4_0/Q8_0/IQ4_NL/..., they may differ between gate, up and down and between layers)
++    const ggml_type_traits_cpu * job_tr_x = nullptr;   // vec_dot traits of x for gate (or gate_up)
++    const ggml_type_traits_cpu * job_tr_x2 = nullptr;  // for up, when its vec_dot type differs from gate's
++    const ggml_type_traits_cpu * job_tr_h = nullptr;   // for the down projection
++    std::vector<char> xq2;           // x quantized for up when job_tr_x2 != nullptr
+     // current job (filled by the leader)
+     struct miss { int t, k, e; };
+     std::vector<miss> job_miss;
+@@ -281,15 +288,25 @@ static void zc_job_part(ggml_cuda_moe_zc * m, int ith) {
+     const int nth = m->n_threads;
+     const int il = m->job_layer;
+     const int nm = (int) m->job_miss.size();
+-    const zc_tensor & tg = m->tensors[m->layer_gate[il]];
+-    const zc_tensor & tu = m->tensors[m->layer_up[il]];
++    const int n_ff = m->n_ff, n_embd = m->n_embd;
++    // separate gate and up tensors, or one gate_up tensor: rows [0, n_ff) gate, [n_ff, 2 n_ff) up
++    const bool fused = m->layer_gate_up[il] >= 0;
++    const zc_tensor & tg = m->tensors[fused ? m->layer_gate_up[il] : m->layer_gate[il]];
++    const zc_tensor & tu = m->tensors[fused ? m->layer_gate_up[il] : m->layer_up[il]];
++    const size_t up_row0 = fused ? (size_t) n_ff : 0;
+     const zc_tensor & td = m->tensors[m->layer_down[il]];
+     const auto * trg = ggml_get_type_traits_cpu(tg.t->type);
+     const auto * tru = ggml_get_type_traits_cpu(tu.t->type);
+     const auto * trd = ggml_get_type_traits_cpu(td.t->type);
+-    const int n_ff = m->n_ff, n_embd = m->n_embd;
+-
+-    // phase 1: gate and up rows of all CPU experts -> h = silu(gate) * up
++    const char * xbase = m->xq.data();
++    const char * xbase_u = m->job_tr_x2 ? m->xq2.data() : m->xq.data();
++    const float * sg = m->scale_gate[il].empty() ? nullptr : m->scale_gate[il].data();
++    const float * su = m->scale_up[il].empty() ? nullptr : m->scale_up[il].data();
++    if (fused) sg = su;  // the graph scales the whole gate_up output by the up scale
++    const float clamp = m->layer_clamp[il];
++    const int act = m->act;
++
++    // phase 1: gate and up rows of all CPU experts -> h = act(gate) * up
+     {
+         const int total = nm * n_ff;
+         const int per = (total + nth - 1) / nth;
+@@ -297,17 +314,30 @@ static void zc_job_part(ggml_cuda_moe_zc * m, int ith) {
+         for (int r = r0; r < r1; ++r) {
+             const int mi = r / n_ff, row = r % n_ff;
+             const auto & ms = m->job_miss[mi];
+-            const char * xq = m->xq.data() + (size_t) ms.t * m->xq_row;
+             float g, u;
+-            trg->vec_dot(n_embd, &g, 0, (const char *) tg.t->data + (size_t) ms.e * tg.expert_stride + (size_t) row * tg.row_bytes, 0, xq, 0, 1);
+-            tru->vec_dot(n_embd, &u, 0, (const char *) tu.t->data + (size_t) ms.e * tu.expert_stride + (size_t) row * tu.row_bytes, 0, xq, 0, 1);
+-            m->h[(size_t) mi * n_ff + row] = zc_silu(g) * u;
++            trg->vec_dot(n_embd, &g, 0, (const char *) tg.t->data + (size_t) ms.e * tg.expert_stride + (size_t) row * tg.row_bytes, 0,
++                xbase + (size_t) ms.t * m->xq_row, 0, 1);
++            tru->vec_dot(n_embd, &u, 0, (const char *) tu.t->data + (size_t) ms.e * tu.expert_stride + (up_row0 + row) * tu.row_bytes, 0,
++                xbase_u + (size_t) ms.t * m->xq_row, 0, 1);
++            if (sg) g *= sg[ms.e];
++            if (su) u *= su[ms.e];
++            float a;
++            if (act == 1) {
++                a = 0.5f * g * (1.0f + std::tanh(0.79788456080286535587989211986876f * g * (1.0f + 0.044715f * g * g)));
++            } else {
++                a = zc_silu(g);
++                if (clamp > 0.0f) {
++                    a = std::min(a, clamp);
++                    u = std::max(-clamp, std::min(u, clamp));
++                }
++            }
++            m->h[(size_t) mi * n_ff + row] = a * u;
+         }
+     }
+     zc_barrier(m);
+     // phase 2: quantize h of each expert for the down projection
+     for (int mi = ith; mi < nm; mi += nth) {
+-        m->tr_q8->from_float(m->h.data() + (size_t) mi * n_ff, m->hq.data() + (size_t) mi * m->hq_row, n_ff);
++        m->job_tr_h->from_float(m->h.data() + (size_t) mi * n_ff, m->hq.data() + (size_t) mi * m->hq_row, n_ff);
+     }
+     zc_barrier(m);
+     // phase 3: down rows -> mailbox out[t][k][:]
+@@ -407,9 +437,20 @@ static void zc_worker(ggml_cuda_moe_zc * m, int ith) {
+                         }
+                     }
+                 }
+-                if (!m->job_miss.empty() && m->layer_gate[il] >= 0) {
++                const bool fused = m->layer_gate_up[il] >= 0;
++                if (!m->job_miss.empty() && (fused || (m->layer_gate[il] >= 0 && m->layer_up[il] >= 0)) && m->layer_down[il] >= 0) {
++                    const ggml_type tg = m->tensors[fused ? m->layer_gate_up[il] : m->layer_gate[il]].t->type;
++                    const ggml_type tu = m->tensors[fused ? m->layer_gate_up[il] : m->layer_up[il]].t->type;
++                    const ggml_type td = m->tensors[m->layer_down[il]].t->type;
++                    const ggml_type vg = ggml_get_type_traits_cpu(tg)->vec_dot_type;
++                    const ggml_type vu = ggml_get_type_traits_cpu(tu)->vec_dot_type;
++                    m->job_tr_x  = ggml_get_type_traits_cpu(vg);
++                    m->job_tr_x2 = vu != vg ? ggml_get_type_traits_cpu(vu) : nullptr;
++                    m->job_tr_h  = ggml_get_type_traits_cpu(ggml_get_type_traits_cpu(td)->vec_dot_type);
+                     for (int t = 0; t < n_tokens; ++t) {
+-                        m->tr_q8->from_float(m->mb_x(il) + (size_t) t * m->n_embd, m->xq.data() + (size_t) t * m->xq_row, m->n_embd);
++                        const float * x = m->mb_x(il) + (size_t) t * m->n_embd;
++                        m->job_tr_x->from_float(x, m->xq.data() + (size_t) t * m->xq_row, m->n_embd);
++                        if (m->job_tr_x2) m->job_tr_x2->from_float(x, m->xq2.data() + (size_t) t * m->xq_row, m->n_embd);
+                     }
+                     m->job_layer = il;
+                     m->st_cpu_jobs++;
+@@ -534,7 +575,7 @@ static __global__ void k_zc_gather(char * dst, const char * host, size_t stride,
+ // Large batches: one DMA batch; cached experts are copied within VRAM, the rest over PCIe.
+ void ggml_cuda_moe_zc_to_vram(ggml_cuda_moe_zc * m, int ti, void * dst, const int32_t * ids, size_t ids_nb1, int n_tokens, cudaStream_t stream) {
+     const zc_tensor & z = m->tensors[ti];
+-    if (z.role == ZC_UP) {
++    if (z.role == ZC_UP || z.role == ZC_GATE_UP) {
+         // remember the experts of the last prompt tokens (read by observe() after the step)
+         const int n = std::min(n_tokens, ZC_PF_TOKENS);
+         CUDA_CHECK(cudaMemcpy2DAsync(m->h_pf_ids + (size_t) z.layer * ZC_PF_TOKENS * m->n_used, m->n_used * sizeof(int32_t),
+@@ -608,7 +649,6 @@ void ggml_cuda_moe_zc_send(ggml_cuda_moe_zc * m, int ti, const float * x, size_t
+         const int32_t * ids, size_t ids_nb_token, int n_tokens, cudaStream_t stream) {
+     const zc_tensor & z = m->tensors[ti];
+     if (z.role != ZC_UP && z.role != ZC_GATE_UP) return;
+-    GGML_ASSERT(z.role == ZC_UP && "moe-zc: fused gate_up experts are not supported yet");
+     const int il = z.layer;
+     CUDA_CHECK(cudaMemcpy2DAsync(m->mb_x(il), m->n_embd * sizeof(float), x, x_nb_token, m->n_embd * sizeof(float), n_tokens,
+         cudaMemcpyDeviceToHost, stream));
+@@ -643,17 +683,23 @@ static void zc_finalize(ggml_cuda_moe_zc * m) {
+     m->layer_gate.assign(m->n_layer, -1);
+     m->layer_up.assign(m->n_layer, -1);
+     m->layer_down.assign(m->n_layer, -1);
++    m->layer_gate_up.assign(m->n_layer, -1);
+     for (size_t ti = 0; ti < m->tensors.size(); ++ti) {
+         const zc_tensor & z = m->tensors[ti];
+-        if (z.role == ZC_GATE) m->layer_gate[z.layer] = (int) ti;
+-        if (z.role == ZC_UP)   m->layer_up[z.layer]   = (int) ti;
+-        if (z.role == ZC_DOWN) m->layer_down[z.layer] = (int) ti;
++        if (z.role == ZC_GATE)    m->layer_gate[z.layer]    = (int) ti;
++        if (z.role == ZC_UP)      m->layer_up[z.layer]      = (int) ti;
++        if (z.role == ZC_DOWN)    m->layer_down[z.layer]    = (int) ti;
++        if (z.role == ZC_GATE_UP) m->layer_gate_up[z.layer] = (int) ti;
+         if (z.role == ZC_DOWN) { m->n_ff = (int) z.t->ne[0]; m->n_embd = (int) z.t->ne[1]; }
++        const auto * tr = ggml_get_type_traits_cpu(z.t->type);
++        GGML_ASSERT(tr->vec_dot && ggml_get_type_traits_cpu(tr->vec_dot_type)->from_float &&
++            "moe-zc: no CPU dot product for this expert weight type");
+     }
+-    m->tr_q8 = ggml_get_type_traits_cpu(GGML_TYPE_Q8_K);
+-    m->xq_row = ggml_row_size(GGML_TYPE_Q8_K, m->n_embd);
+-    m->hq_row = ggml_row_size(GGML_TYPE_Q8_K, m->n_ff);
++    // quantized activations: the row size of any vec_dot type is at most that of F32
++    m->xq_row = ggml_row_size(GGML_TYPE_F32, m->n_embd);
++    m->hq_row = ggml_row_size(GGML_TYPE_F32, m->n_ff);
+     m->xq.resize((size_t) ZC_MAX_TOKENS * m->xq_row);
++    m->xq2.resize((size_t) ZC_MAX_TOKENS * m->xq_row);
+     m->h.resize((size_t) ZC_MAX_TOKENS * m->n_used * m->n_ff);
+     m->hq.resize((size_t) ZC_MAX_TOKENS * m->n_used * m->hq_row);
+ 
+@@ -694,6 +740,9 @@ ggml_cuda_moe_zc * ggml_cuda_moe_zc_create(int device, int n_layer, int n_expert
+     m->n_slots = n_slots;
+     m->slot_bytes = GGML_PAD(slot_bytes, 256);
+     m->layer_tensors.resize(n_layer);
++    m->layer_clamp.assign(n_layer, 0.0f);
++    m->scale_gate.resize(n_layer);
++    m->scale_up.resize(n_layer);
+     if (const char * s = getenv("LLAMA_MOE_ZC_RESERVE"))     m->reserve_slots = atoi(s);
+     if (const char * s = getenv("LLAMA_MOE_ZC_MAX_UPLOADS")) m->max_uploads_per_step = atoi(s);
+     if (const char * s = getenv("LLAMA_MOE_ZC_VERBOSE"))     m->verbose = atoi(s) != 0;
+@@ -734,6 +783,18 @@ void ggml_cuda_moe_zc_add_tensor(ggml_cuda_moe_zc * m, int layer, int role, cons
+     m->tensors.push_back(z);
+ }
+ 
++void ggml_cuda_moe_zc_set_act(ggml_cuda_moe_zc * m, int act) {
++    GGML_ASSERT(!m->tables_ready && (act == 0 || act == 1));
++    m->act = act;
++}
++
++void ggml_cuda_moe_zc_set_layer(ggml_cuda_moe_zc * m, int layer, float clamp, const float * gate_s, const float * up_s) {
++    GGML_ASSERT(!m->tables_ready && layer >= 0 && layer < m->n_layer);
++    m->layer_clamp[layer] = clamp;
++    if (gate_s) m->scale_gate[layer].assign(gate_s, gate_s + m->n_expert);
++    if (up_s)   m->scale_up[layer].assign(up_s, up_s + m->n_expert);
++}
++
+ // after all tensors are registered: allocate tables and mailboxes, start the CPU workers
+ void ggml_cuda_moe_zc_start(ggml_cuda_moe_zc * m, int n_used) {
+     ggml_cuda_set_device(m->device);
+diff --git a/src/llama-moe-zc.cpp b/src/llama-moe-zc.cpp
+index b52048195..811fc59f1 100644
+--- a/src/llama-moe-zc.cpp
++++ b/src/llama-moe-zc.cpp
+@@ -34,6 +34,8 @@ typedef void (*fn_start_t)(struct ggml_cuda_moe_zc *, int);
+ typedef void (*fn_observe_t)(struct ggml_cuda_moe_zc *, const int32_t *, int, int);
+ typedef void (*fn_free_t)(struct ggml_cuda_moe_zc *);
+ typedef void (*fn_launched_t)(struct ggml_cuda_moe_zc *);
++typedef void (*fn_set_act_t)(struct ggml_cuda_moe_zc *, int);
++typedef void (*fn_set_layer_t)(struct ggml_cuda_moe_zc *, int, float, const float *, const float *);
+ 
+ static void * zc_proc(const char * name) {
+     ggml_backend_reg_t reg = ggml_backend_reg_by_name("CUDA");
+@@ -63,6 +65,30 @@ void llama_moe_zc_attach(llama_model & model) {
+         return;
+     }
+ 
++    // the CPU computes whole experts itself, so it must know the FFN of the architecture:
++    // act(gate) * up with SiLU or GELU, optional per-expert scales of gate/up and SwiGLU clamping.
++    // Expert biases and other activations are not implemented: leave such models to plain llama.cpp.
++    int act = -1;
++    switch (model.arch) {
++        case LLM_ARCH_QWEN2MOE: case LLM_ARCH_QWEN3MOE: case LLM_ARCH_QWEN3NEXT: case LLM_ARCH_QWEN35MOE:
++        case LLM_ARCH_QWEN4EXP: case LLM_ARCH_DEEPSEEK2: case LLM_ARCH_GLM4_MOE:
++            act = 0; break;
++        case LLM_ARCH_GEMMA4:
++            act = 1; break;
++        default: break;
++    }
++    if (act < 0) {
++        LLAMA_LOG_WARN("%s: expert FFN of architecture %s is not supported by moe-zc, disabled\n", __func__, model.arch_name().c_str());
++        return;
++    }
++    for (int il = 0; il < n_layer; ++il) {
++        const auto & l = model.layers[il];
++        if (l.ffn_gate_exps_b || l.ffn_up_exps_b || l.ffn_down_exps_b || l.ffn_gate_up_exps_b) {
++            LLAMA_LOG_WARN("%s: expert biases are not supported by moe-zc, disabled\n", __func__);
++            return;
++        }
++    }
++
+     // collect expert tensors per layer and check they are plain host memory
+     std::vector<std::vector<ggml_tensor *>> per_layer(n_layer);
+     std::vector<std::vector<int>> roles(n_layer);
+@@ -110,11 +136,34 @@ void llama_moe_zc_attach(llama_model & model) {
+     // 2. the manager with its VRAM slots
+     const int n_slots = (int) (mib * 1048576.0 / GGML_PAD(slot_bytes, 256));
+     model.moe_zc = create(0, n_layer, n_expert, slot_bytes, n_slots);
++    auto set_act   = (fn_set_act_t)   zc_proc("ggml_cuda_moe_zc_set_act");
++    auto set_layer = (fn_set_layer_t) zc_proc("ggml_cuda_moe_zc_set_layer");
++    GGML_ASSERT(set_act && set_layer);
++    set_act(model.moe_zc, act);
++    int n_scaled = 0, n_clamped = 0;
+     for (int il = 0; il < n_layer; ++il) {
+         for (size_t i = 0; i < per_layer[il].size(); ++i) {
+             add(model.moe_zc, il, roles[il][i], per_layer[il][i]);
+         }
++        // per-expert output scales (f32 [n_expert], usually in VRAM): read them once
++        auto read = [&](const ggml_tensor * s, std::vector<float> & v) -> const float * {
++            if (!s) return nullptr;
++            GGML_ASSERT(s->type == GGML_TYPE_F32 && ggml_nelements(s) == n_expert);
++            v.resize(n_expert);
++            ggml_backend_tensor_get(s, v.data(), 0, n_expert * sizeof(float));
++            return v.data();
++        };
++        std::vector<float> gs, us;
++        const auto & l = model.layers[il];
++        const float * g = read(l.ffn_gate_exps_s, gs);
++        const float * u = read(l.ffn_up_exps_s, us);
++        const float clamp = act == 0 && model.hparams.swiglu_clamp_exp[il] > 1e-6f ? model.hparams.swiglu_clamp_exp[il] : 0.0f;
++        set_layer(model.moe_zc, il, clamp, g, u);
++        n_scaled += (g || u) ? 1 : 0;
++        n_clamped += clamp > 0.0f ? 1 : 0;
+     }
++    LLAMA_LOG_INFO("%s: CPU experts: %s(gate) * up, %d layers with expert scales, %d with clamping\n", __func__,
++        act == 1 ? "GELU" : "SiLU", n_scaled, n_clamped);
+     start(model.moe_zc, n_used); // before the first graph is captured
+ 
+     LLAMA_LOG_INFO("%s: zero-copy expert cache on: %d layers, slot %.2f MiB, %d slots\n", __func__,
+-- 
+2.45.2.windows.1
+

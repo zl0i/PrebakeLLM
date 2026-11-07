@@ -1,0 +1,114 @@
+diff --git a/ggml/src/ggml-cuda/moe-zc.cu b/ggml/src/ggml-cuda/moe-zc.cu
+index e4f50e0d7..0626f446d 100644
+--- a/ggml/src/ggml-cuda/moe-zc.cu
++++ b/ggml/src/ggml-cuda/moe-zc.cu
+@@ -194,7 +194,8 @@ struct ggml_cuda_moe_zc {
+     const ggml_type_traits_cpu * tr_q8   = nullptr;
+     // current job (filled by the leader)
+     struct miss { int t, k, e; };
+-    std::vector<miss> job_miss;
++    std::vector<miss> job_miss;      // sorted by expert
++    std::vector<int>  job_grp;       // start of each distinct expert in job_miss, plus job_miss.size()
+     int job_layer = -1;
+     std::vector<char>  xq;           // quantized x per token
+     std::vector<float> h;            // [miss][n_ff] activation
+@@ -218,6 +219,7 @@ struct ggml_cuda_moe_zc {
+     // statistics
+     int64_t st_hits = 0, st_misses = 0, st_uploads = 0, st_evictions = 0, st_steps = 0, st_tokens = 0, st_no_slot = 0;
+     std::atomic<int64_t> st_cpu_jobs{0}, st_cpu_experts{0}, st_cpu_ns{0};
++    int64_t st_cpu_reads = 0;        // distinct experts read by the CPU (<= st_cpu_experts: tokens of a step share experts)
+     std::atomic<int64_t> last_work_ns{0}; // when the leader last saw a request (idle back-off of the workers)
+ 
+     zc_mailbox * mb(int il) const { return (zc_mailbox *) (h_mail + (size_t) il * mail_stride); }
+@@ -289,19 +291,27 @@ static void zc_job_part(ggml_cuda_moe_zc * m, int ith) {
+     const auto * trd = ggml_get_type_traits_cpu(td.t->type);
+     const int n_ff = m->n_ff, n_embd = m->n_embd;
+ 
++    // job_miss is sorted by expert; job_grp[g] = first miss of the g-th distinct expert (plus an end marker).
++    // Each weight row is read from RAM once and used for every token of the step that needs this expert
++    // (with an MTP draft several tokens of a step often share experts).
++    const int ng = (int) m->job_grp.size() - 1;
+     // phase 1: gate and up rows of all CPU experts -> h = silu(gate) * up
+     {
+-        const int total = nm * n_ff;
++        const int total = ng * n_ff;
+         const int per = (total + nth - 1) / nth;
+         const int r0 = ith * per, r1 = std::min(total, r0 + per);
+         for (int r = r0; r < r1; ++r) {
+-            const int mi = r / n_ff, row = r % n_ff;
+-            const auto & ms = m->job_miss[mi];
+-            const char * xq = m->xq.data() + (size_t) ms.t * m->xq_row;
+-            float g, u;
+-            trg->vec_dot(n_embd, &g, 0, (const char *) tg.t->data + (size_t) ms.e * tg.expert_stride + (size_t) row * tg.row_bytes, 0, xq, 0, 1);
+-            tru->vec_dot(n_embd, &u, 0, (const char *) tu.t->data + (size_t) ms.e * tu.expert_stride + (size_t) row * tu.row_bytes, 0, xq, 0, 1);
+-            m->h[(size_t) mi * n_ff + row] = zc_silu(g) * u;
++            const int gi = r / n_ff, row = r % n_ff;
++            const int e = m->job_miss[m->job_grp[gi]].e;
++            const char * wg = (const char *) tg.t->data + (size_t) e * tg.expert_stride + (size_t) row * tg.row_bytes;
++            const char * wu = (const char *) tu.t->data + (size_t) e * tu.expert_stride + (size_t) row * tu.row_bytes;
++            for (int mi = m->job_grp[gi]; mi < m->job_grp[gi + 1]; ++mi) {
++                const char * xq = m->xq.data() + (size_t) m->job_miss[mi].t * m->xq_row;
++                float g, u;
++                trg->vec_dot(n_embd, &g, 0, wg, 0, xq, 0, 1);
++                tru->vec_dot(n_embd, &u, 0, wu, 0, xq, 0, 1);
++                m->h[(size_t) mi * n_ff + row] = zc_silu(g) * u;
++            }
+         }
+     }
+     zc_barrier(m);
+@@ -312,17 +322,19 @@ static void zc_job_part(ggml_cuda_moe_zc * m, int ith) {
+     zc_barrier(m);
+     // phase 3: down rows -> mailbox out[t][k][:]
+     {
+-        const int total = nm * n_embd;
++        const int total = ng * n_embd;
+         const int per = (total + nth - 1) / nth;
+         const int r0 = ith * per, r1 = std::min(total, r0 + per);
+         float * out = m->mb_out(il);
+         for (int r = r0; r < r1; ++r) {
+-            const int mi = r / n_embd, row = r % n_embd;
+-            const auto & ms = m->job_miss[mi];
+-            float v;
+-            trd->vec_dot(n_ff, &v, 0, (const char *) td.t->data + (size_t) ms.e * td.expert_stride + (size_t) row * td.row_bytes, 0,
+-                m->hq.data() + (size_t) mi * m->hq_row, 0, 1);
+-            out[((size_t) ms.t * m->n_used + ms.k) * n_embd + row] = v;
++            const int gi = r / n_embd, row = r % n_embd;
++            const char * wd = (const char *) td.t->data + (size_t) m->job_miss[m->job_grp[gi]].e * td.expert_stride + (size_t) row * td.row_bytes;
++            for (int mi = m->job_grp[gi]; mi < m->job_grp[gi + 1]; ++mi) {
++                const auto & ms = m->job_miss[mi];
++                float v;
++                trd->vec_dot(n_ff, &v, 0, wd, 0, m->hq.data() + (size_t) mi * m->hq_row, 0, 1);
++                out[((size_t) ms.t * m->n_used + ms.k) * n_embd + row] = v;
++            }
+         }
+     }
+     zc_barrier(m);
+@@ -408,6 +420,14 @@ static void zc_worker(ggml_cuda_moe_zc * m, int ith) {
+                     }
+                 }
+                 if (!m->job_miss.empty() && m->layer_gate[il] >= 0) {
++                    std::sort(m->job_miss.begin(), m->job_miss.end(),
++                        [](const ggml_cuda_moe_zc::miss & a, const ggml_cuda_moe_zc::miss & b) { return a.e != b.e ? a.e < b.e : a.t < b.t; });
++                    m->job_grp.clear();
++                    for (int i = 0; i < (int) m->job_miss.size(); ++i) {
++                        if (i == 0 || m->job_miss[i].e != m->job_miss[i - 1].e) m->job_grp.push_back(i);
++                    }
++                    m->job_grp.push_back((int) m->job_miss.size());
++                    m->st_cpu_reads += (int64_t) m->job_grp.size() - 1;
+                     for (int t = 0; t < n_tokens; ++t) {
+                         m->tr_q8->from_float(m->mb_x(il) + (size_t) t * m->n_embd, m->xq.data() + (size_t) t * m->xq_row, m->n_embd);
+                     }
+@@ -901,11 +921,12 @@ void ggml_cuda_moe_zc_launched(ggml_cuda_moe_zc * m) {
+ 
+ void ggml_cuda_moe_zc_free(ggml_cuda_moe_zc * m) {
+     if (!m) return;
+-    GGML_LOG_INFO("moe_zc: steps %lld tokens %lld | VRAM hit %.2f%% | CPU experts %lld (%.2f/token, %.1f us/expert) | uploads %lld (%.2f/step) | evictions %lld\n",
++    GGML_LOG_INFO("moe_zc: steps %lld tokens %lld | VRAM hit %.2f%% | CPU experts %lld (%.2f/token, %.1f us/expert), distinct reads %lld (%.1f us/read) | uploads %lld (%.2f/step) | evictions %lld\n",
+         (long long) m->st_steps, (long long) m->st_tokens,
+         100.0 * m->st_hits / std::max<int64_t>(1, m->st_hits + m->st_misses),
+         (long long) m->st_cpu_experts.load(), (double) m->st_cpu_experts.load() / std::max<int64_t>(1, m->st_tokens),
+         m->st_cpu_ns.load() / 1000.0 / std::max<int64_t>(1, m->st_cpu_experts.load()),
++        (long long) m->st_cpu_reads, m->st_cpu_ns.load() / 1000.0 / std::max<int64_t>(1, m->st_cpu_reads),
+         (long long) m->st_uploads, (double) m->st_uploads / std::max<int64_t>(1, m->st_steps), (long long) m->st_evictions);
+     m->stop = true;
+     for (auto & w : m->workers) w.join();

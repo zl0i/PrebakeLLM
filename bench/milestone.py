@@ -39,7 +39,9 @@ def ours(model, cfg=None, name="ours (aic build)"):
     for flag in ("-m", "-c", "-np"):  # serverbench adds these itself
         i = args.index(flag)
         del args[i:i + 2]
-    env = {"LLAMA_MOE_ZC_MIB": str(cfg["cache_mib"]), "LLAMA_MOE_ZC_THREADS": str(cfg.get("cpu_threads", 8))}
+    env = {}
+    if cfg.get("mode", "moe-zc") == "moe-zc":
+        env = {"LLAMA_MOE_ZC_MIB": str(cfg["cache_mib"]), "LLAMA_MOE_ZC_THREADS": str(cfg.get("cpu_threads", 8))}
     return {"name": name, "server": str(aic.ENGINE), "args": args, "env": env}
 
 

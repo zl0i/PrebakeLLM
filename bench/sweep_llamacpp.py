@@ -109,6 +109,27 @@ STAGES = {
         ("ik_cache6000_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 6000 -nmm -t 8 -md {MTP} --spec-type mtp:n_max=2"),
         ("ik_cache6500_mtp2_t6", f"-ngl 99 -cmoe --moe-cache-mib 6500 -nmm -t 6 -md {MTP} --spec-type mtp:n_max=2"),
     ],
+    # GLM-4.7-Flash without an MTP layer (unsloth file): no draft possible, so placement x cache x threads
+    "glm_nodraft": [
+        ("fit_lmnone", "-lm none -t 8"),
+        ("cache7000_t8", "-ngl 99 -cmoe --moe-cache-mib 7000 -lm none -t 8"),
+        ("cache7500_t8", "-ngl 99 -cmoe --moe-cache-mib 7500 -lm none -t 8"),
+        ("cache8000_t6", "-ngl 99 -cmoe --moe-cache-mib 8000 -lm none -t 6"),
+        ("cache8000_t8", "-ngl 99 -cmoe --moe-cache-mib 8000 -lm none -t 8"),
+        ("cache8500_t6", "-ngl 99 -cmoe --moe-cache-mib 8500 -lm none -t 6"),
+    ],
+    # the same for ik_llama.cpp (MLA 3, fused MoE and flash attention are its defaults)
+    "ik_glm": [
+        ("ik_ncmoe28", "-ngl 99 -ncmoe 28 -nmm -t 8"),
+        ("ik_ncmoe32", "-ngl 99 -ncmoe 32 -nmm -t 8"),
+        ("ik_cache7500", "-ngl 99 -cmoe --moe-cache-mib 7500 -nmm -t 8"),
+        ("ik_cache8000", "-ngl 99 -cmoe --moe-cache-mib 8000 -nmm -t 8"),
+        ("ik_cache8000_t6", "-ngl 99 -cmoe --moe-cache-mib 8000 -nmm -t 6"),
+        ("ik_cache8000_muge", "-ngl 99 -cmoe --moe-cache-mib 8000 -nmm -t 8 -muge"),
+        ("ik_cache8000_ger", "-ngl 99 -cmoe --moe-cache-mib 8000 -nmm -t 8 -ger"),
+        ("ik_cache8000_rtr", "-ngl 99 -cmoe --moe-cache-mib 8000 -nmm -t 8 -rtr"),
+        ("ik_cache8500", "-ngl 99 -cmoe --moe-cache-mib 8500 -nmm -t 8"),
+    ],
 }
 
 
