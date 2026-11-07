@@ -1,0 +1,26 @@
+[
+ {
+  "name": "ours 0.8B draft n2",
+  "ours_cfg": {
+   "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+   "draft_n": 2,
+   "cpu_threads": 6,
+   "ctx": 20480,
+   "cache_mib": 5627,
+   "draft_type": "simple",
+   "draft_model": "Qwen3.5-0.8B-Q8_0.gguf"
+  }
+ },
+ {
+  "name": "ours 0.8B draft n3",
+  "ours_cfg": {
+   "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+   "draft_n": 3,
+   "cpu_threads": 6,
+   "ctx": 20480,
+   "cache_mib": 5627,
+   "draft_type": "simple",
+   "draft_model": "Qwen3.5-0.8B-Q8_0.gguf"
+  }
+ }
+]

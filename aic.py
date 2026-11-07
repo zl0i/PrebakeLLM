@@ -122,12 +122,12 @@ def model_info(model: pathlib.Path) -> dict:
 
 def find_small_drafts(model: pathlib.Path, info: dict) -> list:
     """Smaller models in the same folder with the same tokenizer (usable as a classic draft model),
-    smallest first, at most two; a draft must be at most a quarter of the model."""
+    smallest first, at most two; a draft must be at most a third of the model."""
     out = []
     for p in sorted(model.parent.glob("*.gguf"), key=lambda p: p.stat().st_size):
         if p == model or p.name.startswith(("mtp-", "dflash-")) or "-of-0" in p.name and "-00001-of-" not in p.name:
             continue
-        if p.stat().st_size // 1048576 > info["size_mib"] // 4:
+        if p.stat().st_size // 1048576 > info["size_mib"] // 3:
             break
         try:
             di = model_info(p)
@@ -298,7 +298,9 @@ def cmd_build(a):
         # a small model of the family as the draft instead of the MTP head (it costs VRAM: smaller cache)
         for d in smalls:
             d_mib = (model.parent / d).stat().st_size // 1048576
-            for n in (4, 8):
+            # draft + 1 tokens are checked per step; the hybrid path takes at most 4 (ZC_MAX_TOKENS in moe-zc.cu),
+            # longer drafts fall back to the prompt-processing path that copies experts every step (10x slower)
+            for n in (2, 3):
                 trial(dict(base, cache_mib=int(max_cache_nodraft - d_mib - 512), draft_type="simple", draft_model=d, draft_n=n))
         # then the CPU threads that compute the experts not in VRAM, around the best so far
         best_zc = [c for _, c in ranked() if c["mode"] == "moe-zc"]
