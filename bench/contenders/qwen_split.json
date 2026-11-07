@@ -1,0 +1,4 @@
+[
+ {"name": "llama.cpp best (cache6500+mtp3)", "server": "", "args": ["-ngl","99","-cmoe","-lm","none","-t","8","--moe-cache-mib","6500","-md","models/mtp-Qwen3.6-35B-A3B-Q4_0.gguf","--spec-type","draft-mtp","--spec-draft-n-max","3"]},
+ {"name": "ours with llama.cpp's decisions (cache6500, mtp3, 8 thr)", "ours_cfg": {"mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf", "draft_n": 3, "cpu_threads": 8, "ctx": 20480, "cache_mib": 6500}}
+]

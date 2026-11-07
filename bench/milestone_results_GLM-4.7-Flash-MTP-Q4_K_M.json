@@ -1,82 +1,46 @@
 {
- "llama.cpp cache8000 t6": [
+ "llama.cpp best (ncmoe47 cache7400+mtp1)": [
   {
-   "short": 60.46995063955063,
-   "long": 50.4345081211425,
-   "pp_long": 609.707299398303,
-   "acc": null,
-   "cpu_busy": 0.059625,
-   "gpu_w": 72.9625,
-   "log": "20261108-001443_ms_GLM-4.7-Flas_llama_cpp_cache8000_t6_r0.jsonl"
-  },
-  {
-   "short": 60.97647350845354,
-   "long": 52.36382632951755,
-   "pp_long": 609.6680979427559,
-   "acc": null,
-   "cpu_busy": 0.057,
-   "gpu_w": 75.2625,
-   "log": "20261108-001937_ms_GLM-4.7-Flas_llama_cpp_cache8000_t6_r1.jsonl"
+   "short": 66.63522669725121,
+   "long": 53.625843029797046,
+   "pp_long": 576.7388522660051,
+   "acc": 0.8049149056006187,
+   "cpu_busy": 0.059875000000000005,
+   "gpu_w": 71.8375,
+   "log": "20261108-003033_ms_GLM-4.7-Flas_llama_cpp_best__ncmoe47_cache7400_mtp1__r0.jsonl"
   }
  ],
- "llama.cpp ncmoe47 cache7400+mtp1 (MTP layer on GPU)": [
+ "llama.cpp best no-draft (cache8000 t6)": [
   {
-   "short": 67.15279312838173,
-   "long": 53.840881824965194,
-   "pp_long": 577.5723070518644,
-   "acc": 0.8049149056006187,
-   "cpu_busy": 0.059625,
-   "gpu_w": 70.75,
-   "log": "20261108-001605_ms_GLM-4.7-Flas_llama_cpp_ncmoe47_cache7400_mtp1__MTP_layer_on_GPU__r0.jsonl"
-  },
-  {
-   "short": 66.17940972105917,
-   "long": 54.21675603926824,
-   "pp_long": 576.8244117718273,
-   "acc": 0.8049149056006187,
-   "cpu_busy": 0.05625,
-   "gpu_w": 70.6125,
-   "log": "20261108-002054_ms_GLM-4.7-Flas_llama_cpp_ncmoe47_cache7400_mtp1__MTP_layer_on_GPU__r1.jsonl"
+   "short": 61.74511776867581,
+   "long": 51.045256724612045,
+   "pp_long": 610.5571881519954,
+   "acc": null,
+   "cpu_busy": 0.05725,
+   "gpu_w": 74.3625,
+   "log": "20261108-003154_ms_GLM-4.7-Flas_llama_cpp_best_no_draft__cache8000_t6__r0.jsonl"
   }
  ],
- "ours with Qwen's choice (draft 2)": [
+ "ours with llama.cpp's decisions (mtp1, cache max)": [
   {
-   "short": 61.39989923320617,
-   "long": 52.308346832647544,
-   "pp_long": 683.4908132074768,
-   "acc": 0.5832316472446227,
-   "cpu_busy": 0.27575,
-   "gpu_w": 91.6375,
-   "log": "20261108-001721_ms_GLM-4.7-Flas_ours_with_Qwen_s_choice__draft_2__r0.jsonl"
-  },
-  {
-   "short": 62.42903993015095,
-   "long": 52.345896759111575,
-   "pp_long": 685.0282272431599,
-   "acc": 0.5832316472446227,
-   "cpu_busy": 0.27775,
-   "gpu_w": 99.425,
-   "log": "20261108-002209_ms_GLM-4.7-Flas_ours_with_Qwen_s_choice__draft_2__r1.jsonl"
+   "short": 62.53185114455034,
+   "long": 61.53164572539657,
+   "pp_long": 680.4931442369416,
+   "acc": 0.817266630076472,
+   "cpu_busy": 0.2815,
+   "gpu_w": 66.0,
+   "log": "20261108-003310_ms_GLM-4.7-Flas_ours_with_llama_cpp_s_decisions__mtp1__cache_max__r0.jsonl"
   }
  ],
  "ours (aic build)": [
   {
-   "short": 86.61421070753221,
-   "long": 70.7234762003022,
-   "pp_long": 743.1072803931058,
+   "short": 85.89703564107684,
+   "long": 71.16929192973721,
+   "pp_long": 743.4710855853261,
    "acc": null,
-   "cpu_busy": 0.27637500000000004,
-   "gpu_w": 122.375,
-   "log": "20261108-001837_ms_GLM-4.7-Flas_ours__aic_build__r0.jsonl"
-  },
-  {
-   "short": 86.63235148049671,
-   "long": 71.24787723236363,
-   "pp_long": 743.2574516011598,
-   "acc": null,
-   "cpu_busy": 0.27587500000000004,
-   "gpu_w": 123.1875,
-   "log": "20261108-002325_ms_GLM-4.7-Flas_ours__aic_build__r1.jsonl"
+   "cpu_busy": 0.27675,
+   "gpu_w": 116.0375,
+   "log": "20261108-003425_ms_GLM-4.7-Flas_ours__aic_build__r0.jsonl"
   }
  ]
 }

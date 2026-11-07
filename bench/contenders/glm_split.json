@@ -1,0 +1,5 @@
+[
+ {"name": "llama.cpp best (ncmoe47 cache7400+mtp1)", "server": "", "args": ["-ngl","99","-ncmoe","47","-lm","none","-t","6","--moe-cache-mib","7400","--spec-type","draft-mtp","--spec-draft-n-max","1"]},
+ {"name": "llama.cpp best no-draft (cache8000 t6)", "server": "", "args": ["-ngl","99","-cmoe","-lm","none","-t","6","--moe-cache-mib","8000"]},
+ {"name": "ours with llama.cpp's decisions (mtp1, cache max)", "ours_cfg": {"mtp_file": "embedded", "draft_n": 1, "cpu_threads": 6, "ctx": 20480, "cache_mib": 7288}}
+]

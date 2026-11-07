@@ -2,7 +2,11 @@
 
 Программа «собирает» самый быстрый способ запуска выбранной LLM на конкретном компьютере (по аналогии с компиляцией шейдеров под видеокарту), сохраняет результат и дальше запускает модель по нему. Постановка задачи: `ТЗ для Claude Code «компилятор» запуска LLM под конкретное железо.md`.
 
-**Статус:** веха 1. Модель Qwen3.6-35B-A3B (UD-Q4_K_M, 22 ГБ) на RTX 4070 Super 12 ГБ + i7-13700KF + 64 ГБ DDR5. Итоги — в [PROGRESS.md](PROGRESS.md) и [BENCHMARKS.md](BENCHMARKS.md).
+**Статус:** веха 1 достигнута. Qwen3.6-35B-A3B (UD-Q4_K_M, 22 ГБ) и вторая модель GLM-4.7-Flash на RTX 4070 Super 12 ГБ + i7-13700KF + 64 ГБ DDR5. Итоги — в [PROGRESS.md](PROGRESS.md) и [BENCHMARKS.md](BENCHMARKS.md).
+
+**Чего ждать при повторе.** Абсолютные цифры зависят от состояния машины: схемы питания и фоновых программ, которые занимают GPU. Сравнивать нужно участников внутри одного прогона.
+- Веха 1 (до перезагрузки 2026-11-08): наш движок 124.1 / 130.9 ток/с, llama.cpp 106.0 / 108.9.
+- После перезагрузки (схема «Сбалансированная», браузеры в фоне): наш ~118 / 131, llama.cpp ~98 / 100.
 
 ## Как это работает (коротко)
 
@@ -42,7 +46,9 @@ python aic.py show  --model models/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf   # что в�
 |---|---|
 | `tools\hwbench\build.bat && tools\hwbench\hwbench.exe` | потолки железа: RAM, VRAM, PCIe, zero-copy, запуск ядер |
 | `python bench/sweep_llamacpp.py <stage>` | перебор настроек llama.cpp (эталон) → `bench/sweep_results.csv` |
-| `python bench/milestone.py --rounds 3` | итоговое сравнение: наш движок против трёх лучших конфигураций llama.cpp |
+| `python bench/milestone.py --contenders bench/contenders/milestone1_Qwen3.6.json --rounds 3` | итоговое сравнение вехи 1: наш движок (сохранённая сборка из `cache/`; копии профилей — в `bench/profiles/`) против трёх лучших конфигураций llama.cpp |
+| `python bench/milestone.py --model models/GLM-4.7-Flash-MTP-Q4_K_M.gguf --rounds 2` | то же для второй модели |
+| `python bench/milestone.py --contenders bench/contenders/qwen_split.json --rounds 1` | разделение выигрыша: вклад движка и вклад подбора |
 | `bash bench/quality.sh` | perplexity и KL-дивергенция против эталонных логитов |
 | `python bench/compare_outputs.py <ref.jsonl> <cand.jsonl>` | где расходятся жадные ответы |
 
