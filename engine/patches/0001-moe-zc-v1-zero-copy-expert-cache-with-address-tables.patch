@@ -1,7 +1,7 @@
 From 46e07fd84f77517bf2a2e896b328cdcd82249a47 Mon Sep 17 00:00:00 2001
 From: Dmitri <d.popov@posteam.top>
 Date: Sat, 7 Nov 2026 20:59:44 +0300
-Subject: [PATCH 1/4] moe-zc v1: zero-copy expert cache with address tables
+Subject: [PATCH 1/5] moe-zc v1: zero-copy expert cache with address tables
  (experts in pinned RAM read by GPU, VRAM slots, CRF policy)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

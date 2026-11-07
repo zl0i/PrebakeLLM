@@ -71,7 +71,8 @@ def main():
 
     port = 8096
     log = open(ROOT / "bench" / "logs" / "make_model_prompts.server.log", "w", encoding="utf-8")
-    proc = sb.start_server([str(sb.DEFAULT_SERVER), "-m", str(model), "-ngl", "0", "-c", "512", "--port", str(port), "--no-webui"], log)
+    proc = sb.start_server([str(sb.DEFAULT_SERVER), "-m", str(model), "-ngl", "0", "-c", "512", "--port", str(port), "--no-webui"]
+                           + sb.template_args(str(model)), log)
     base = f"http://127.0.0.1:{port}"
     try:
         sb.wait_ready(base, proc)

@@ -85,6 +85,12 @@ class PowerSampler:
         self.proc.terminate()
 
 
+def template_args(model: str) -> list:
+    """Chat template for model files that lack one (bench/templates/<model>.jinja, taken from the official release)."""
+    t = ROOT / "bench" / "templates" / (pathlib.Path(model).stem + ".jinja")
+    return ["--jinja", "--chat-template-file", str(t)] if t.exists() else []
+
+
 def vram_free_mib() -> int:
     out = subprocess.run(["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
                          capture_output=True, text=True).stdout

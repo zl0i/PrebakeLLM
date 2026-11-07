@@ -1,0 +1,5 @@
+[
+ {"name": "llama.cpp cache8000 t6", "server": "", "args": ["-ngl", "99", "-cmoe", "-lm", "none", "-t", "6", "--moe-cache-mib", "8000"]},
+ {"name": "llama.cpp cache7500 t8", "server": "", "args": ["-ngl", "99", "-cmoe", "-lm", "none", "-t", "8", "--moe-cache-mib", "7500"]},
+ {"name": "llama.cpp cache7500+mtp1", "server": "", "args": ["-ngl", "99", "-cmoe", "-lm", "none", "-t", "8", "--moe-cache-mib", "7500", "--spec-type", "draft-mtp", "--spec-draft-n-max", "1"]}
+]

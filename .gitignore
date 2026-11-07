@@ -16,3 +16,4 @@ bench/prof/
 /build_*.log
 bench/quality/
 cache/
+llama.log

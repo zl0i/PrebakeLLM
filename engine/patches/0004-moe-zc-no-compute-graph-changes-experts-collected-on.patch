@@ -1,7 +1,7 @@
 From 9796af9b8e126a29fab928d1c32462981b89f465 Mon Sep 17 00:00:00 2001
 From: Dmitri <d.popov@posteam.top>
 Date: Sat, 7 Nov 2026 21:54:40 +0300
-Subject: [PATCH 4/4] moe-zc: no compute graph changes (experts collected on
+Subject: [PATCH 4/5] moe-zc: no compute graph changes (experts collected on
  the CUDA side), no CUDA graph replay of host-planned prefill copies; prefill
  now bit-identical to upstream
 

@@ -1,0 +1,81 @@
+From 5c93efb9df3693916242d0bd1c24253296f3306a Mon Sep 17 00:00:00 2001
+From: Dmitri <d.popov@posteam.top>
+Date: Sat, 7 Nov 2026 23:17:08 +0300
+Subject: [PATCH 5/5] moe-zc: CPU workers sleep when idle (no CPU load while
+ the server waits)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ ggml/src/ggml-cuda/moe-zc.cu | 28 ++++++++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/moe-zc.cu b/ggml/src/ggml-cuda/moe-zc.cu
+index a46fa87aa..446d92029 100644
+--- a/ggml/src/ggml-cuda/moe-zc.cu
++++ b/ggml/src/ggml-cuda/moe-zc.cu
+@@ -218,6 +218,7 @@ struct ggml_cuda_moe_zc {
+     // statistics
+     int64_t st_hits = 0, st_misses = 0, st_uploads = 0, st_evictions = 0, st_steps = 0, st_tokens = 0, st_no_slot = 0;
+     std::atomic<int64_t> st_cpu_jobs{0}, st_cpu_experts{0}, st_cpu_ns{0};
++    std::atomic<int64_t> last_work_ns{0}; // when the leader last saw a request (idle back-off of the workers)
+ 
+     zc_mailbox * mb(int il) const { return (zc_mailbox *) (h_mail + (size_t) il * mail_stride); }
+     float   * mb_x  (int il) const { return (float *)   ((char *) mb(il) + sizeof(zc_mailbox)); }
+@@ -357,8 +358,30 @@ static void zc_pin_thread(int ith) {
+ #endif
+ }
+ 
++// Spinning keeps a worker's reaction time ~1 us during generation, but it burns a CPU core.
++// When there was no request for ZC_IDLE_MS (the server waits for a user, or prompt processing
++// runs on the GPU alone), the workers sleep 1 ms per check instead: the first layer of the next
++// request then waits a few ms once, and an idle server does not load the CPU.
++#define ZC_IDLE_MS 50
++
++static int64_t zc_now_ns() {
++    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
++}
++
++static void zc_idle_wait(ggml_cuda_moe_zc * m, uint32_t & spins) {
++    if (++spins < 4096) {
++        _mm_pause();
++        return;
++    }
++    spins = 0;
++    if (zc_now_ns() - m->last_work_ns.load(std::memory_order_relaxed) > (int64_t) ZC_IDLE_MS * 1000000) {
++        std::this_thread::sleep_for(std::chrono::milliseconds(1));
++    }
++}
++
+ static void zc_worker(ggml_cuda_moe_zc * m, int ith) {
+     zc_pin_thread(ith);
++    uint32_t spins = 0;
+     if (ith == 0) {
+         // leader: watches the mailboxes of all layers
+         std::vector<uint32_t> seen(m->n_layer, 0);
+@@ -370,6 +393,7 @@ static void zc_worker(ggml_cuda_moe_zc * m, int ith) {
+                 if (req == seen[il]) continue;
+                 any = true;
+                 seen[il] = req;
++                m->last_work_ns.store(zc_now_ns(), std::memory_order_relaxed);
+                 std::atomic_thread_fence(std::memory_order_acquire);
+                 // collect the experts this step must compute on the CPU
+                 const int n_tokens = (int) b->n_tokens;
+@@ -398,13 +422,13 @@ static void zc_worker(ggml_cuda_moe_zc * m, int ith) {
+                 std::atomic_thread_fence(std::memory_order_release);
+                 b->done = req;
+             }
+-            if (!any) _mm_pause();
++            if (!any) zc_idle_wait(m, spins);
+         }
+     } else {
+         uint32_t gen = m->job_gen.load();
+         while (!m->stop.load(std::memory_order_relaxed)) {
+             const uint32_t g = m->job_gen.load(std::memory_order_acquire);
+-            if (g == gen) { _mm_pause(); continue; }
++            if (g == gen) { zc_idle_wait(m, spins); continue; }
+             gen = g;
+             zc_job_part(m, ith);
+         }
+-- 
+2.45.2.windows.1
+

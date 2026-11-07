@@ -101,7 +101,7 @@ def server_args(model: pathlib.Path, cfg: dict) -> list:
         if draft != "embedded":
             args += ["-md", str(model.parent / draft)]
         args += ["--spec-type", "draft-mtp", "--spec-draft-n-max", str(cfg["draft_n"])]
-    return args
+    return args + sb.template_args(str(model))
 
 
 def server_env(cfg: dict) -> dict:
@@ -160,18 +160,25 @@ def cmd_build(a):
     t_start = time.time()
     trials = []
 
-    # 1. how much VRAM does everything except the expert cache take?
-    probe = measure(model, dict(base, cache_mib=PROBE_CACHE_MIB), prompts[:1], n_predict=32)
-    if not probe["ok"]:
-        raise SystemExit(f"engine failed to start: {probe['error']}")
-    fixed = probe["vram_free_before"] - probe["vram_free_loaded"] - PROBE_CACHE_MIB
-    max_cache = probe["vram_free_before"] - fixed - MARGIN_MIB
-    print(f"fixed VRAM use (dense weights, KV, buffers, draft): {fixed} MiB -> expert cache up to {max_cache} MiB")
+    # 1. how much VRAM does everything except the expert cache take? (with and without the draft head:
+    #    without speculation the MTP layer is not loaded, which leaves more room for the expert cache)
+    def probe_max_cache(draft_n):
+        pr = measure(model, dict(base, cache_mib=PROBE_CACHE_MIB, draft_n=draft_n), prompts[:1], n_predict=32, passes=1)
+        if not pr["ok"]:
+            raise SystemExit(f"engine failed to start: {pr['error']}")
+        fixed = pr["vram_free_before"] - pr["vram_free_loaded"] - PROBE_CACHE_MIB
+        mc = pr["vram_free_before"] - fixed - MARGIN_MIB
+        print(f"fixed VRAM use (dense weights, KV, buffers{', draft' if draft_n else ''}): {fixed} MiB -> expert cache up to {mc} MiB")
+        return fixed, mc
+
+    fixed, max_cache = probe_max_cache(2 if mtp else 0)
+    max_cache_nodraft = probe_max_cache(0)[1] if mtp else max_cache
 
     # 2. small search over the decisions that matter most (each trial = real engine run)
     grid = []
-    for cache in (max_cache, max_cache - 512):
-        for dn in ([2, 3] if mtp else [0]):
+    for dn in ([0, 1, 2, 3] if mtp else [0]):   # speculation can also hurt (a draft that guesses badly)
+        top = max_cache_nodraft if dn == 0 else max_cache
+        for cache in (top, top - 512):
             grid.append(dict(base, cache_mib=int(cache), draft_n=dn))
     def trial(cfg):
         r = measure(model, cfg, prompts)
