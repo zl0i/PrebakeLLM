@@ -1,0 +1,292 @@
+From 9796af9b8e126a29fab928d1c32462981b89f465 Mon Sep 17 00:00:00 2001
+From: Dmitri <d.popov@posteam.top>
+Date: Sat, 7 Nov 2026 21:54:40 +0300
+Subject: [PATCH 4/4] moe-zc: no compute graph changes (experts collected on
+ the CUDA side), no CUDA graph replay of host-planned prefill copies; prefill
+ now bit-identical to upstream
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu |  7 +++++
+ ggml/src/ggml-cuda/moe-zc.cu    | 30 ++++++++++++++++++-
+ src/llama-context.cpp           |  2 +-
+ src/llama-graph.cpp             | 15 ----------
+ src/llama-graph.h               |  3 --
+ src/llama-model.h               |  2 --
+ src/llama-moe-zc.cpp            | 51 +++++----------------------------
+ src/llama-moe-zc.h              |  7 +----
+ 8 files changed, 45 insertions(+), 72 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index bfaf3ca81..0d6cb46d4 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -3063,6 +3063,13 @@ static bool ggml_cuda_graph_check_compability(ggml_cgraph * cgraph) {
+                     GGML_LOG_DEBUG("%s: disabling CUDA graphs due to unsupported node type\n", __func__);
+                 }
+             }
++            // [moe-zc] large batches copy host-resident experts to VRAM with copies planned on the host from
++            // the current cache state (moe-zc.cu, ggml_cuda_moe_zc_to_vram): a recorded graph would replay stale copies
++            ggml_cuda_moe_zc * zm = nullptr;
++            int zt = -1;
++            if (node->src[2] && node->src[2]->ne[1] > 64 && ggml_cuda_moe_zc_lookup(node->src[0]->data, &zm, &zt)) {
++                use_cuda_graph = false;
++            }
+         }
+ 
+         if (!use_cuda_graph) {
+diff --git a/ggml/src/ggml-cuda/moe-zc.cu b/ggml/src/ggml-cuda/moe-zc.cu
+index c41ca40a8..a46fa87aa 100644
+--- a/ggml/src/ggml-cuda/moe-zc.cu
++++ b/ggml/src/ggml-cuda/moe-zc.cu
+@@ -52,6 +52,7 @@
+ #endif
+ 
+ #define ZC_MAX_TOKENS 4   // must not exceed the mmvq MoE batch limit of the expert types (Q6_K: 4)
++#define ZC_PF_TOKENS  64  // prompt processing: experts of the last 64 tokens of a batch warm up the cache
+ 
+ enum zc_role { ZC_GATE = 0, ZC_UP = 1, ZC_DOWN = 2, ZC_GATE_UP = 3 };
+ 
+@@ -210,6 +211,8 @@ struct ggml_cuda_moe_zc {
+     bool up_go = false;            // set when the next graph has been launched (see ggml_cuda_moe_zc_launched)
+ 
+     std::vector<uint32_t> observed_req;  // per layer: last mailbox request seen by observe()
++    int32_t * h_pf_ids = nullptr;        // pinned [n_layer][ZC_PF_TOKENS][n_used]: experts of the last prompt tokens
++    std::vector<int> pf_n;               // per layer: tokens in h_pf_ids (set when the copy is enqueued)
+     std::vector<int32_t>  step_ids;      // scratch: ids[token][layer][k] of the current step
+ 
+     // statistics
+@@ -507,6 +510,13 @@ static __global__ void k_zc_gather(char * dst, const char * host, size_t stride,
+ // Large batches: one DMA batch; cached experts are copied within VRAM, the rest over PCIe.
+ void ggml_cuda_moe_zc_to_vram(ggml_cuda_moe_zc * m, int ti, void * dst, const int32_t * ids, size_t ids_nb1, int n_tokens, cudaStream_t stream) {
+     const zc_tensor & z = m->tensors[ti];
++    if (z.role == ZC_UP) {
++        // remember the experts of the last prompt tokens (read by observe() after the step)
++        const int n = std::min(n_tokens, ZC_PF_TOKENS);
++        CUDA_CHECK(cudaMemcpy2DAsync(m->h_pf_ids + (size_t) z.layer * ZC_PF_TOKENS * m->n_used, m->n_used * sizeof(int32_t),
++            (const char *) ids + (size_t) (n_tokens - n) * ids_nb1, ids_nb1, m->n_used * sizeof(int32_t), n, cudaMemcpyDeviceToHost, stream));
++        m->pf_n[z.layer] = n;
++    }
+     const void * const * table = ggml_cuda_moe_zc_table(m, ti);
+     GGML_ASSERT(z.expert_bytes % 16 == 0 && z.expert_stride % 16 == 0);
+     if (n_tokens <= 64) {
+@@ -625,6 +635,8 @@ static void zc_finalize(ggml_cuda_moe_zc * m) {
+         }
+     }
+     m->observed_req.assign(m->n_layer, 0);
++    CUDA_CHECK(cudaMallocHost((void **) &m->h_pf_ids, sizeof(int32_t) * m->n_layer * ZC_PF_TOKENS * m->n_used));
++    m->pf_n.assign(m->n_layer, 0);
+     ggml_cpu_init();
+     for (int i = 0; i < m->n_threads; ++i) {
+         m->workers.emplace_back(zc_worker, m, i);
+@@ -702,7 +714,22 @@ void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_t
+     }
+     // ids == nullptr: decode step (<= ZC_MAX_TOKENS tokens), read the experts from the mailboxes
+     // of the layers that ran in this step (no copy in the compute graph needed)
+-    if (ids == nullptr) {
++    if (ids == nullptr && n_tokens > ZC_MAX_TOKENS) {
++        // prompt processing step: experts of its last tokens, captured by ggml_cuda_moe_zc_to_vram
++        int nt = 0;
++        for (int il = 0; il < m->n_layer; ++il) nt = std::max(nt, m->pf_n[il]);
++        m->step_ids.assign((size_t) std::max(nt, 1) * m->n_layer * n_used, -1);
++        for (int il = 0; il < m->n_layer; ++il) {
++            for (int t = 0; t < m->pf_n[il]; ++t) {
++                for (int k = 0; k < n_used; ++k) {
++                    m->step_ids[((size_t) t * m->n_layer + il) * n_used + k] = m->h_pf_ids[((size_t) il * ZC_PF_TOKENS + t) * m->n_used + k];
++                }
++            }
++            m->pf_n[il] = 0;
++        }
++        ids = m->step_ids.data();
++        n_tokens = std::max(nt, 1);
++    } else if (ids == nullptr) {
+         m->step_ids.assign((size_t) n_tokens * m->n_layer * n_used, -1);
+         for (int il = 0; il < m->n_layer; ++il) {
+             const zc_mailbox * b = m->mb(il);
+@@ -856,6 +883,7 @@ void ggml_cuda_moe_zc_free(ggml_cuda_moe_zc * m) {
+     if (m->d_tables) cudaFree((void *) m->d_tables);
+     if (m->h_tables) cudaFreeHost((void *) m->h_tables);
+     if (m->h_mail) cudaFreeHost(m->h_mail);
++    if (m->h_pf_ids) cudaFreeHost(m->h_pf_ids);
+     if (m->d_seq) cudaFree(m->d_seq);
+     delete m;
+ }
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index dfda78b91..49f5bd9aa 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -1746,7 +1746,7 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
+     }
+ 
+     // [moe-zc] let the zero-copy expert cache learn from the experts this step used
+-    llama_moe_zc_after_compute(model, sched.get(), res->moe_zc_layers, (int) ubatch.n_tokens);
++    llama_moe_zc_after_compute(model, sched.get(), (int) ubatch.n_tokens);
+ 
+     ret = GGML_STATUS_SUCCESS;
+ 
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index f9a6c3d5e..d1ee7c090 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -1402,7 +1402,6 @@ int64_t llm_graph_result::get_max_nodes() const {
+ }
+ 
+ void llm_graph_result::reset() {
+-    moe_zc_layers.clear();
+     t_inp_tokens  = nullptr;
+     t_inp_embd    = nullptr;
+     t_logits      = nullptr;
+@@ -2363,20 +2362,6 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     }
+     cb(selected_experts, "ffn_moe_topk", il);
+ 
+-    // [moe-zc] hand the selected experts of this layer to the zero-copy expert cache (llama-moe-zc.cpp)
+-    // (steps of <= LLAMA_MOE_ZC_HYBRID_TOKENS tokens report their experts through the GPU<->CPU mailboxes instead,
+-    //  so the top-k fusion of the CUDA backend is not broken on the hot path)
+-    if (model.moe_zc_ids && il >= 0 && il < model.moe_zc_ids->ne[2] && n_tokens > 4 &&
+-        selected_experts->ne[0] == model.moe_zc_ids->ne[0]) {
+-        const int64_t n_cap = std::min<int64_t>(n_tokens, model.moe_zc_ids->ne[1]); // the last n_cap tokens
+-        ggml_tensor * src = ggml_view_2d(ctx0, selected_experts, selected_experts->ne[0], n_cap,
+-            selected_experts->nb[1], (n_tokens - n_cap) * selected_experts->nb[1]);
+-        ggml_tensor * dst = ggml_view_2d(ctx0, model.moe_zc_ids, selected_experts->ne[0], n_cap,
+-            model.moe_zc_ids->nb[1], il * model.moe_zc_ids->nb[2]);
+-        ggml_build_forward_expand(gf, ggml_cpy(ctx0, src, dst));
+-        res->moe_zc_layers.push_back(il);
+-    }
+-
+     if (arch == LLM_ARCH_GROVEMOE && n_expert != hparams.n_expert) {
+         // TODO: Use scalar div instead when/if implemented
+         ggml_tensor * f_sel = ggml_cast(ctx0, selected_experts, GGML_TYPE_F32);
+diff --git a/src/llama-graph.h b/src/llama-graph.h
+index b9bd761c2..6d25dab8c 100644
+--- a/src/llama-graph.h
++++ b/src/llama-graph.h
+@@ -925,9 +925,6 @@ class llm_graph_result {
+ public:
+     llm_graph_result(int64_t max_nodes);
+ 
+-    // [moe-zc] layers whose selected expert ids this graph copies into model.moe_zc_ids
+-    std::vector<int> moe_zc_layers;
+-
+     virtual ~llm_graph_result() = default;
+ 
+     ggml_tensor * get_inp_tokens()  const { return t_inp_tokens; }
+diff --git a/src/llama-model.h b/src/llama-model.h
+index 419a59eac..6d8e54b82 100644
+--- a/src/llama-model.h
++++ b/src/llama-model.h
+@@ -955,8 +955,6 @@ struct llama_model {
+ 
+     // [moe-zc] zero-copy expert cache (llama-moe-zc.cpp), enabled with LLAMA_MOE_ZC_MIB
+     struct ggml_cuda_moe_zc * moe_zc = nullptr;
+-    struct ggml_tensor * moe_zc_ids = nullptr;          // [n_used, 8, n_layer] I32 in VRAM
+-    struct ggml_context * moe_zc_ctx = nullptr;
+     std::vector<ggml_backend_buffer_t> moe_zc_bufs;
+ 
+     explicit llama_model(const llama_model_params & params);
+diff --git a/src/llama-moe-zc.cpp b/src/llama-moe-zc.cpp
+index 360912f38..b52048195 100644
+--- a/src/llama-moe-zc.cpp
++++ b/src/llama-moe-zc.cpp
+@@ -12,10 +12,9 @@
+ //     The expert tensors are moved to that wrapper, so the scheduler runs their
+ //     matrix multiplications on the GPU, reading RAM over PCIe when needed;
+ //  2. a manager with N VRAM slots is created and all expert tensors are registered;
+-//  3. every MoE layer copies its selected expert ids into a small VRAM tensor
+-//     (llama-graph.cpp), and after each decode step (<= 8 tokens) the ids are
+-//     handed to the manager (llama-context.cpp), which updates the cache in the
+-//     background.
++//  3. after each step the manager learns which experts were used (it collects them
++//     itself on the CUDA side) and updates the cache in the background
++//     (llama-context.cpp calls llama_moe_zc_after_compute / llama_moe_zc_launched).
+ 
+ #include "llama-moe-zc.h"
+ 
+@@ -118,15 +117,6 @@ void llama_moe_zc_attach(llama_model & model) {
+     }
+     start(model.moe_zc, n_used); // before the first graph is captured
+ 
+-    // 3. VRAM tensor that receives the selected expert ids of each layer: [n_used, 8 tokens, n_layer]
+-    ggml_init_params ip = { ggml_tensor_overhead() * 2, nullptr, true };
+-    model.moe_zc_ctx = ggml_init(ip);
+-    model.moe_zc_ids = ggml_new_tensor_3d(model.moe_zc_ctx, GGML_TYPE_I32, n_used, LLAMA_MOE_ZC_MAX_TOKENS, n_layer);
+-    ggml_set_name(model.moe_zc_ids, "moe_zc_ids");
+-    ggml_backend_dev_t gpu = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_GPU);
+-    ggml_backend_buffer_t ids_buf = ggml_backend_alloc_ctx_tensors_from_buft(model.moe_zc_ctx, ggml_backend_dev_buffer_type(gpu));
+-    model.moe_zc_bufs.push_back(ids_buf);
+-
+     LLAMA_LOG_INFO("%s: zero-copy expert cache on: %d layers, slot %.2f MiB, %d slots\n", __func__,
+         n_layer, slot_bytes / 1048576.0, n_slots);
+ }
+@@ -143,44 +133,17 @@ void llama_moe_zc_detach(llama_model & model) {
+         ggml_backend_buffer_free(b);
+     }
+     model.moe_zc_bufs.clear();
+-    if (model.moe_zc_ctx) {
+-        ggml_free(model.moe_zc_ctx);
+-        model.moe_zc_ctx = nullptr;
+-    }
+ }
+ 
+-void llama_moe_zc_after_compute(const llama_model & model, ggml_backend_sched_t sched, const std::vector<int> & layers, int n_tokens) {
++void llama_moe_zc_after_compute(const llama_model & model, ggml_backend_sched_t sched, int n_tokens) {
+     if (!model.moe_zc) {
+         return;
+     }
+     static fn_observe_t observe = (fn_observe_t) zc_proc("ggml_cuda_moe_zc_observe");
+-    const ggml_tensor * t = model.moe_zc_ids;
+-    const int n_used  = (int) t->ne[0];
+-    const int n_layer = (int) t->ne[2];
+-
++    // the CUDA side collected the experts of this step itself (mailboxes for generation steps,
++    // a copy of the last prompt tokens' experts for prompt processing): the compute graph is unchanged
+     ggml_backend_sched_synchronize(sched);
+-    if (n_tokens <= LLAMA_MOE_ZC_HYBRID_TOKENS) {
+-        observe(model.moe_zc, nullptr, n_tokens, n_used); // the experts are read from the GPU<->CPU mailboxes
+-        return;
+-    }
+-    if (layers.empty()) {
+-        return;
+-    }
+-    n_tokens = std::min(n_tokens, LLAMA_MOE_ZC_MAX_TOKENS); // the graph copied the ids of the last tokens
+-    std::vector<int32_t> raw(ggml_nelements(t));
+-    ggml_backend_tensor_get(t, raw.data(), 0, ggml_nbytes(t));
+-
+-    // reorder [layer][token][k] -> [token][layer][k], layers not computed in this graph = -1
+-    std::vector<int32_t> ids((size_t) n_tokens * n_layer * n_used, -1);
+-    for (int il : layers) {
+-        if (il < 0 || il >= n_layer) continue;
+-        for (int tok = 0; tok < n_tokens; ++tok) {
+-            for (int k = 0; k < n_used; ++k) {
+-                ids[((size_t) tok * n_layer + il) * n_used + k] = raw[((size_t) il * LLAMA_MOE_ZC_MAX_TOKENS + tok) * n_used + k];
+-            }
+-        }
+-    }
+-    observe(model.moe_zc, ids.data(), n_tokens, n_used);
++    observe(model.moe_zc, nullptr, n_tokens, (int) model.hparams.n_expert_used_max());
+ }
+ 
+ void llama_moe_zc_launched(const llama_model & model) {
+diff --git a/src/llama-moe-zc.h b/src/llama-moe-zc.h
+index 2782c8b1d..f00fe99dd 100644
+--- a/src/llama-moe-zc.h
++++ b/src/llama-moe-zc.h
+@@ -8,14 +8,9 @@
+ 
+ struct llama_model;
+ 
+-// max tokens per step whose expert ids are observed; for larger batches (prompt processing) the last
+-// LLAMA_MOE_ZC_MAX_TOKENS tokens are observed, which warms the VRAM cache before generation starts
+-#define LLAMA_MOE_ZC_MAX_TOKENS 64
+-// steps up to this many tokens run hybrid (GPU + CPU experts) and report their experts through the mailboxes
+-#define LLAMA_MOE_ZC_HYBRID_TOKENS 4
+ 
+ void llama_moe_zc_attach(llama_model & model);
+ void llama_moe_zc_detach(llama_model & model);
+-void llama_moe_zc_after_compute(const llama_model & model, ggml_backend_sched_t sched, const std::vector<int> & layers, int n_tokens);
++void llama_moe_zc_after_compute(const llama_model & model, ggml_backend_sched_t sched, int n_tokens);
+ // a compute graph was launched: background uploads may start (they then overlap with the computation)
+ void llama_moe_zc_launched(const llama_model & model);
+-- 
+2.45.2.windows.1
+

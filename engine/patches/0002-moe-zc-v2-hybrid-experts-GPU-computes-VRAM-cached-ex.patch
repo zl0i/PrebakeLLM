@@ -1,0 +1,1270 @@
+From 187eb60283eb19acf272f4c4a3705d6854da925a Mon Sep 17 00:00:00 2001
+From: Dmitri <d.popov@posteam.top>
+Date: Sat, 7 Nov 2026 21:31:36 +0300
+Subject: [PATCH 2/4] moe-zc v2: hybrid experts - GPU computes VRAM-cached
+ experts, CPU workers compute the rest in parallel via pinned mailboxes; async
+ batched uploads after graph launch; prefill warm-up
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ ggml/include/ggml-cuda.h          |   4 +-
+ ggml/src/ggml-cuda/CMakeLists.txt |   4 +
+ ggml/src/ggml-cuda/common.cuh     |  13 +-
+ ggml/src/ggml-cuda/ggml-cuda.cu   |   6 +
+ ggml/src/ggml-cuda/mmvq.cu        |  29 +-
+ ggml/src/ggml-cuda/moe-zc.cu      | 760 +++++++++++++++++++++++-------
+ src/llama-context.cpp             |   1 +
+ src/llama-graph.cpp               |  11 +-
+ src/llama-moe-zc.cpp              |  36 +-
+ src/llama-moe-zc.h                |   9 +-
+ 10 files changed, 682 insertions(+), 191 deletions(-)
+
+diff --git a/ggml/include/ggml-cuda.h b/ggml/include/ggml-cuda.h
+index e000e674b..1158dfe5a 100644
+--- a/ggml/include/ggml-cuda.h
++++ b/ggml/include/ggml-cuda.h
+@@ -46,7 +46,9 @@ GGML_BACKEND_API ggml_backend_reg_t ggml_backend_cuda_reg(void);
+ GGML_BACKEND_API ggml_backend_buffer_t ggml_backend_cuda_buffer_from_host_ptr(int device, void * ptr, size_t size);
+ typedef struct ggml_cuda_moe_zc ggml_cuda_moe_zc;
+ GGML_BACKEND_API ggml_cuda_moe_zc * ggml_cuda_moe_zc_create(int device, int n_layer, int n_expert, size_t slot_bytes, int n_slots);
+-GGML_BACKEND_API void ggml_cuda_moe_zc_add_tensor(ggml_cuda_moe_zc * m, int layer, const struct ggml_tensor * t);
++GGML_BACKEND_API void ggml_cuda_moe_zc_add_tensor(ggml_cuda_moe_zc * m, int layer, int role, const struct ggml_tensor * t); // role: 0 gate, 1 up, 2 down, 3 gate_up
++GGML_BACKEND_API void ggml_cuda_moe_zc_start(ggml_cuda_moe_zc * m, int n_used);
++GGML_BACKEND_API void ggml_cuda_moe_zc_launched(ggml_cuda_moe_zc * m);
+ GGML_BACKEND_API void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_tokens, int n_used);
+ GGML_BACKEND_API void ggml_cuda_moe_zc_free(ggml_cuda_moe_zc * m);
+ 
+diff --git a/ggml/src/ggml-cuda/CMakeLists.txt b/ggml/src/ggml-cuda/CMakeLists.txt
+index 297d9ffc9..e6bf42e16 100644
+--- a/ggml/src/ggml-cuda/CMakeLists.txt
++++ b/ggml/src/ggml-cuda/CMakeLists.txt
+@@ -132,6 +132,10 @@ if (CUDAToolkit_FOUND)
+                              ${GGML_SOURCES_CUDA}
+                             )
+ 
++    # [moe-zc] CPU workers use the quantized dot products of the CPU backend
++    target_link_libraries(ggml-cuda PRIVATE ggml-cpu)
++
++
+     if (GGML_CUDA_GRAPHS)
+         add_compile_definitions(GGML_CUDA_USE_GRAPHS)
+     endif()
+diff --git a/ggml/src/ggml-cuda/common.cuh b/ggml/src/ggml-cuda/common.cuh
+index 06c6d70a4..ae0b76c66 100644
+--- a/ggml/src/ggml-cuda/common.cuh
++++ b/ggml/src/ggml-cuda/common.cuh
+@@ -1602,14 +1602,21 @@ struct ggml_cuda_mm_fusion_args_device {
+     const void * shared_gate = nullptr;
+     float * shared_dst = nullptr;
+     uint32_t shared_stride_col_dst = 0;
+-    // [moe-zc] per-expert base pointers of src0 / gate (VRAM slot or pinned host RAM), see moe-zc.cu.
++    // [moe-zc] per-expert VRAM addresses of src0 / gate, nullptr = expert computed on the CPU (moe-zc.cu).
+     // When set, the expert's data is read from table[expert] instead of base + expert*stride.
+     const void * const * x_table = nullptr;
+     const void * const * gate_table = nullptr;
+ };
+ 
+-// [moe-zc] expert table registered for a weight tensor's data, or nullptr (moe-zc.cu)
+-const void * const * ggml_cuda_get_expert_table(const void * data);
++// [moe-zc] hybrid GPU+CPU MoE experts (moe-zc.cu)
++struct ggml_cuda_moe_zc;
++bool ggml_cuda_moe_zc_lookup(const void * data, ggml_cuda_moe_zc ** m, int * ti);
++const void * const * ggml_cuda_moe_zc_table(ggml_cuda_moe_zc * m, int ti);
++int  ggml_cuda_moe_zc_max_tokens();
++void ggml_cuda_moe_zc_send(ggml_cuda_moe_zc * m, int ti, const float * x, size_t x_nb_token,
++        const int32_t * ids, size_t ids_nb_token, int n_tokens, cudaStream_t stream);
++void ggml_cuda_moe_zc_recv(ggml_cuda_moe_zc * m, int ti, float * dst, size_t dst_nb1, size_t dst_nb2,
++        const int32_t * ids, size_t ids_nb_token, int n_tokens, cudaStream_t stream);
+ 
+ struct ggml_cuda_kernel_launch_params {
+     dim3 block_nums;
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index 87af2ae91..bfaf3ca81 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -6603,6 +6603,12 @@ static void * ggml_backend_cuda_reg_get_proc_address(ggml_backend_reg_t reg, con
+     if (strcmp(name, "ggml_cuda_moe_zc_free") == 0) {
+         return (void *)ggml_cuda_moe_zc_free;
+     }
++    if (strcmp(name, "ggml_cuda_moe_zc_start") == 0) {
++        return (void *)ggml_cuda_moe_zc_start;
++    }
++    if (strcmp(name, "ggml_cuda_moe_zc_launched") == 0) {
++        return (void *)ggml_cuda_moe_zc_launched;
++    }
+     return nullptr;
+ }
+ 
+diff --git a/ggml/src/ggml-cuda/mmvq.cu b/ggml/src/ggml-cuda/mmvq.cu
+index cf2ff1f25..0f8314540 100644
+--- a/ggml/src/ggml-cuda/mmvq.cu
++++ b/ggml/src/ggml-cuda/mmvq.cu
+@@ -742,6 +742,9 @@ static __global__ void mul_mat_vec_q(
+     uint32_t channel_x_off = channel_x;
+     if (ncols_dst == 1 && ids && fusion.x_table && !shared_expert) {
+         vx = fusion.x_table[channel_x];
++        if (vx == nullptr) {
++            return; // not in VRAM: this expert is computed on the CPU
++        }
+         if constexpr (has_fusion) {
+             if (use_gate) {
+                 vgate = fusion.gate_table[channel_x];
+@@ -960,6 +963,9 @@ static __global__ void mul_mat_vec_q_moe(
+     uint32_t channel_x_off = channel_x;
+     if (fusion.x_table && !shared_expert) {
+         vx = fusion.x_table[channel_x];
++        if (vx == nullptr) {
++            return; // not in VRAM: this expert is computed on the CPU
++        }
+         if (use_gate) {
+             vgate = fusion.gate_table[channel_x];
+         }
+@@ -1560,13 +1566,19 @@ void ggml_cuda_mul_mat_vec_q(
+         fusion_local.glu_limit = fusion->glu_limit;
+     }
+ 
+-    // [moe-zc] expert address tables, if this weight is managed by the zero-copy expert cache
+-    if (ids) {
+-        fusion_local.x_table = ggml_cuda_get_expert_table(src0->data);
+-        if (fusion_local.x_table && fusion && fusion->gate) {
+-            fusion_local.gate_table = ggml_cuda_get_expert_table(fusion->gate->data);
+-            GGML_ASSERT(fusion_local.gate_table && "moe-zc: gate and up experts must both be registered");
++    // [moe-zc] hybrid experts: the GPU computes the experts found in VRAM (address tables),
++    // CPU threads compute the others at the same time (moe-zc.cu)
++    ggml_cuda_moe_zc * zc_m = nullptr;
++    int zc_ti = -1;
++    if (ids && ne2 <= ggml_cuda_moe_zc_max_tokens() && ggml_cuda_moe_zc_lookup(src0->data, &zc_m, &zc_ti)) {
++        fusion_local.x_table = ggml_cuda_moe_zc_table(zc_m, zc_ti);
++        if (fusion && fusion->gate) {
++            ggml_cuda_moe_zc * zc_g = nullptr;
++            int zc_tg = -1;
++            GGML_ASSERT(ggml_cuda_moe_zc_lookup(fusion->gate->data, &zc_g, &zc_tg) && "moe-zc: gate and up experts must both be registered");
++            fusion_local.gate_table = ggml_cuda_moe_zc_table(zc_g, zc_tg);
+         }
++        ggml_cuda_moe_zc_send(zc_m, zc_ti, src1_d, src1->nb[2], ids_d, ids->nb[1], (int) ne2, ctx.stream());
+     }
+ 
+     // If src0 is a temporary compute buffer, clear any potential padding.
+@@ -1616,6 +1628,11 @@ void ggml_cuda_mul_mat_vec_q(
+         ne01,              ncols_dst,     s01, stride_col_y,     stride_col_dst,
+         ne02, nchannels_y, nchannels_dst, s02, stride_channel_y, stride_channel_dst,
+         ne03,              ne3,           s03, s13,              s3,               ids_stride, stream);
++
++    // [moe-zc] after the down projection: wait for the CPU experts and put their outputs into dst
++    if (zc_m) {
++        ggml_cuda_moe_zc_recv(zc_m, zc_ti, dst_d, dst->nb[1], dst->nb[2], ids_d, ids->nb[1], (int) ne2, stream);
++    }
+ }
+ 
+ void ggml_cuda_op_mul_mat_vec_q(
+diff --git a/ggml/src/ggml-cuda/moe-zc.cu b/ggml/src/ggml-cuda/moe-zc.cu
+index a58befce7..d8cdcadfb 100644
+--- a/ggml/src/ggml-cuda/moe-zc.cu
++++ b/ggml/src/ggml-cuda/moe-zc.cu
+@@ -1,85 +1,111 @@
+-// moe-zc: "zero-copy" expert cache for MoE models that do not fit in VRAM.
++// moe-zc: hybrid GPU+CPU execution of MoE experts for models that do not fit in VRAM.
+ // Part of the ai "LLM compiler" project (fork of llama.cpp, MIT).
+ //
+ // The idea in plain words
+ // -----------------------
+-// All expert weights stay in pinned (page-locked) host RAM. The GPU can read
+-// that memory directly over PCIe ("zero-copy"), so every expert is always
+-// usable by a GPU kernel without any copy and without asking the CPU.
++// All expert weights stay in pinned host RAM. The experts used often *right now*
++// also get a copy in a VRAM "slot" (a cache). For every expert weight tensor we
++// keep a small table in GPU memory: table[e] = address of expert e's VRAM copy,
++// or nullptr if expert e is not in VRAM.
+ //
+-// Reading over PCIe is ~20x slower than reading VRAM, so the experts that are
+-// used often *right now* get a copy in a VRAM "slot". For every expert weight
+-// tensor we keep a small table in GPU memory: table[e] = where expert e is
+-// read from (its VRAM slot, or its place in host RAM). The matrix-vector
+-// kernel (mmvq.cu) looks the address up in this table.
++// When a layer runs (decode, <= ZC_MAX_TOKENS tokens):
++//   * the GPU matrix-vector kernels (mmvq.cu) compute the experts found in VRAM
++//     and skip the others (table entry nullptr);
++//   * at the same time CPU worker threads compute the skipped ("cold") experts
++//     straight from RAM: the CPU reads RAM at ~76 GB/s, far faster than the GPU
++//     could pull the same weights over PCIe (~22 GB/s);
++//   * the GPU waits for the CPU's results and puts them where the skipped
++//     experts' outputs belong; the rest of llama.cpp's graph is unchanged.
+ //
+-// Which experts deserve a slot is decided on the CPU, after each generated
+-// token, from the experts that token used (every miss is copied in; the
+-// victim is chosen by recency and frequency, see zc_crf). New copies are uploaded on a separate CUDA stream while the GPU is
+-// already computing the next token, so the CPU never sits on the critical
+-// path of a token. This replaces llama.cpp's --moe-cache-mib, which stops the
+-// GPU in every layer to ask the CPU which experts to upload.
++// GPU and CPU talk through a "mailbox" in pinned host memory that both can
++// read and write: a tiny GPU kernel writes the request flag, the CPU threads
++// spin on it; the CPU writes the done flag, a tiny GPU kernel spins on it.
++// No CUDA API call is made by the CPU during a token, so the whole token stays
++// one CUDA graph; a round trip costs ~4 us (measured, tools/pingpong).
+ //
+-// Safety rules (the GPU may read the tables at any moment):
+-//  * a table entry always points to valid data: first the data is uploaded,
+-//    then (later on the same stream) the table entry is changed;
+-//  * an evicted slot is not overwritten until the token that might still be
+-//    reading it through an old table entry has finished ("quarantine").
++// Which experts get a VRAM slot is decided after each step from the experts the
++// step used (replacement policy CRF adapted from llama.cpp's MoE cache). New
++// copies are uploaded on a separate stream during the next token; table
++// changes are published only between steps, so GPU kernels and CPU threads of
++// one step always see the same split into "VRAM" and "CPU" experts.
+ 
+ #include "common.cuh"
+ #include "ggml-cuda.h"
++#include "ggml-cpu.h"
+ 
+ #include <algorithm>
++#include <atomic>
++#include <cmath>
+ #include <cstdio>
+ #include <cstdlib>
+-#include <cmath>
++#include <chrono>
++#include <condition_variable>
+ #include <mutex>
++#include <thread>
+ #include <unordered_map>
+ #include <vector>
+ 
+-// ------------------------------------------------------------------ registry
+-// weight tensor data pointer -> device table of per-expert base pointers.
+-// Read by mmvq.cu when it launches a MUL_MAT_ID kernel.
++#include <immintrin.h>
++#ifdef _WIN32
++#define NOMINMAX
++#include <windows.h>
++#endif
+ 
+-static std::mutex g_zc_mutex;
+-static std::unordered_map<const void *, const void * const *> g_zc_tables;
++#define ZC_MAX_TOKENS 4   // must not exceed the mmvq MoE batch limit of the expert types (Q6_K: 4)
+ 
+-const void * const * ggml_cuda_get_expert_table(const void * data) {
+-    std::lock_guard<std::mutex> lock(g_zc_mutex);
+-    if (g_zc_tables.empty()) {
+-        return nullptr;
+-    }
+-    auto it = g_zc_tables.find(data);
+-    return it == g_zc_tables.end() ? nullptr : it->second;
+-}
++enum zc_role { ZC_GATE = 0, ZC_UP = 1, ZC_DOWN = 2, ZC_GATE_UP = 3 };
+ 
+-// ------------------------------------------------------------------ manager
++struct ggml_cuda_moe_zc;
+ 
+ struct zc_tensor {
+     const ggml_tensor * t;
+     int    layer;
+-    int    part;          // position inside the slot: 0,1,2 = order of registration within the layer
++    int    role;
+     size_t expert_bytes;  // bytes of one expert in this tensor
+     size_t expert_stride; // nb[2]
+     size_t slot_offset;   // where this part of the expert lives inside a slot
++    size_t row_bytes;     // bytes of one row (ne0 elements)
+ };
+ 
+-// Replacement policy: CRF classes, adapted from llama.cpp src/llama-moe-cache.cpp
+-// (moe_cache_lru, MIT). CRF ("combined recency and frequency") = number of uses of an
+-// expert, decaying with a half-life of 128 tokens, kept even after eviction. Slots are
+-// kept in one LRU list per class = floor(log2(CRF)); the victim is the least recently
+-// used slot of the list with the largest age / 2^class. Frequently used experts thus
+-// survive short pauses, rarely used ones leave first.
++// ------------------------------------------------------------------ registry
++// weight tensor data pointer -> (manager, tensor index). Read by mmvq.cu.
++
++struct zc_reg_entry {
++    ggml_cuda_moe_zc * m;
++    int ti;
++};
++static std::mutex g_zc_mutex;
++static std::unordered_map<const void *, zc_reg_entry> g_zc_reg;
++
++// ------------------------------------------------------------------ mailbox
++// One per layer, in pinned host memory mapped into the GPU address space.
++
++struct zc_mailbox {
++    volatile uint32_t req;       // written by the GPU: sequence number of the request
++    uint32_t n_tokens;
++    uint32_t pad0[30];
++    volatile uint32_t done;      // written by the CPU: sequence number of the finished request
++    uint32_t pad1[31];
++    // followed by: float x[ZC_MAX_TOKENS][n_embd]; int32 ids[ZC_MAX_TOKENS][n_used];
++    //              float out[ZC_MAX_TOKENS][n_used][n_embd]
++};
++
++// ------------------------------------------------------------------ CRF policy
++// Adapted from llama.cpp src/llama-moe-cache.cpp (moe_cache_lru, MIT). CRF =
++// number of uses of an expert, decaying with a half-life of 128 tokens, kept
++// after eviction. Slots are in one LRU list per class floor(log2(CRF)); the
++// victim is the least recently used slot of the list with the largest
++// age / 2^class: frequently used experts survive pauses, rare ones leave first.
+ struct zc_crf {
+     static constexpr int   n_class   = 8;
+-    static constexpr float half_life = 128.0f; // tokens
++    static constexpr float half_life = 128.0f;
+ 
+-    std::vector<int32_t> prev, next;      // [slot] doubly linked lists, -1 at the ends
+-    std::vector<int8_t>  list_of;         // [slot] class list, -1 if not in a list (free/quarantined)
+-    int32_t head[n_class], tail[n_class]; // head = least recently used
+-    std::vector<float>   crf;             // [key]
+-    std::vector<int64_t> last_use;        // [key] clock at last use
+-    int64_t clock = 0;                    // tokens seen
++    std::vector<int32_t> prev, next;
++    std::vector<int8_t>  list_of;
++    int32_t head[n_class], tail[n_class];
++    std::vector<float>   crf;
++    std::vector<int64_t> last_use;
++    int64_t clock = 0;
+ 
+     void init(int n_slots, int n_keys) {
+         prev.assign(n_slots, -1);
+@@ -100,7 +126,7 @@ struct zc_crf {
+         prev[s] = next[s] = -1;
+         list_of[s] = -1;
+     }
+-    void push(int s, int c) { // to the most recently used end of list c
++    void push(int s, int c) {
+         unlink(s);
+         prev[s] = tail[c];
+         next[s] = -1;
+@@ -110,77 +136,104 @@ struct zc_crf {
+     }
+ };
+ 
++// ------------------------------------------------------------------ manager
++
+ struct ggml_cuda_moe_zc {
+     int device;
+     int n_layer;
+     int n_expert;
+     int n_slots;
+     size_t slot_bytes;
++    int n_embd = 0, n_ff = 0, n_used = 0;
+ 
+-    int reserve_slots = 64;  // free + quarantined slots kept ready for the next step's misses
+-    int max_uploads_per_step = 64;
++    int  reserve_slots = 32;
++    int  max_uploads_per_step = 64;
+     bool verbose = false;
++    int  n_threads = 8;
+ 
+-    char * d_slots = nullptr;            // n_slots * slot_bytes in VRAM
++    char * d_slots = nullptr;
+ 
+     std::vector<zc_tensor> tensors;
+-    std::vector<std::vector<int>> layer_tensors; // layer -> indices into tensors
++    std::vector<std::vector<int>> layer_tensors;  // layer -> tensor indices
++    std::vector<int> layer_gate, layer_up, layer_down; // layer -> tensor index or -1
+ 
+-    // tables: [tensor][expert] pointers, host mirror (pinned) + device copy
++    // tables [tensor][expert]: host mirror (pinned) + device copy, nullptr = not in VRAM
+     const void ** h_tables = nullptr;
+     const void ** d_tables = nullptr;
+     bool tables_ready = false;
+-    bool tables_dirty = false;
+ 
+     cudaStream_t copy_stream = nullptr;
+     cudaEvent_t  copy_done   = nullptr;
+     bool         copy_pending = false;
+ 
+-    // cache state
++    // cache state (host side)
+     zc_crf policy;
+-    std::vector<int> slot_of;            // key -> slot or -1   (key = layer*n_expert + expert)
+-    std::vector<int> key_of_slot;        // slot -> key or -1
+-    std::vector<int64_t> used_step;      // key -> last step that selected it (never evict those)
++    std::vector<int> slot_of;        // key -> slot or -1 (includes uploads not yet published)
++    std::vector<uint8_t> published;  // key -> 1 if the GPU table points to VRAM (what kernels and CPU see)
++    std::vector<int> key_of_slot;
++    std::vector<int64_t> used_step;
+     std::vector<int> free_slots;
+-    std::vector<std::pair<int64_t, int>> quarantine; // (step when reusable, slot)
++    std::vector<int> pending;        // keys uploaded during the current token, published next step
+     int64_t step = 0;
+ 
++    // mailboxes
++    char * h_mail = nullptr;         // pinned, mapped
++    char * d_mail = nullptr;         // the same memory as seen by the GPU
++    size_t mail_stride = 0;
++    uint32_t * d_seq = nullptr;      // [n_layer] device-side request counters
++
++    // CPU workers
++    std::vector<std::thread> workers;
++    std::atomic<bool> stop{false};
++    std::atomic<uint32_t> job_gen{0};
++    std::atomic<int> job_left{0};
++    std::atomic<uint32_t> barrier_count{0};
++    std::atomic<uint32_t> barrier_gen{0};
++    const ggml_type_traits_cpu * tr_gate = nullptr;
++    const ggml_type_traits_cpu * tr_q8   = nullptr;
++    // current job (filled by the leader)
++    struct miss { int t, k, e; };
++    std::vector<miss> job_miss;
++    int job_layer = -1;
++    std::vector<char>  xq;           // quantized x per token
++    std::vector<float> h;            // [miss][n_ff] activation
++    std::vector<char>  hq;           // quantized h per miss
++    size_t xq_row = 0, hq_row = 0;
++
++    // uploader thread: issues the cudaMemcpyAsync calls of a step off the critical path
++    std::thread uploader;
++    std::mutex up_mutex;
++    std::condition_variable up_cv;
++    std::vector<std::pair<int, int>> up_list;   // (key, slot) to upload
++    bool up_has_work = false;
++    bool up_busy = false;
++    bool up_go = false;            // set when the next graph has been launched (see ggml_cuda_moe_zc_launched)
++
++    std::vector<uint32_t> observed_req;  // per layer: last mailbox request seen by observe()
++    std::vector<int32_t>  step_ids;      // scratch: ids[token][layer][k] of the current step
++
+     // statistics
+     int64_t st_hits = 0, st_misses = 0, st_uploads = 0, st_evictions = 0, st_steps = 0, st_tokens = 0, st_no_slot = 0;
+-};
++    std::atomic<int64_t> st_cpu_jobs{0}, st_cpu_experts{0}, st_cpu_ns{0};
+ 
+-static void zc_init_tables(ggml_cuda_moe_zc * m) {
+-    const size_t n = m->tensors.size() * (size_t) m->n_expert;
+-    CUDA_CHECK(cudaMallocHost((void **) &m->h_tables, n * sizeof(void *)));
+-    CUDA_CHECK(cudaMalloc((void **) &m->d_tables, n * sizeof(void *)));
+-    for (size_t ti = 0; ti < m->tensors.size(); ++ti) {
+-        const zc_tensor & z = m->tensors[ti];
+-        for (int e = 0; e < m->n_expert; ++e) {
+-            m->h_tables[ti * m->n_expert + e] = (const char *) z.t->data + (size_t) e * z.expert_stride;
+-        }
+-    }
+-    CUDA_CHECK(cudaMemcpy(m->d_tables, m->h_tables, n * sizeof(void *), cudaMemcpyHostToDevice));
+-    std::lock_guard<std::mutex> lock(g_zc_mutex);
+-    for (size_t ti = 0; ti < m->tensors.size(); ++ti) {
+-        g_zc_tables[m->tensors[ti].t->data] = m->d_tables + ti * m->n_expert;
+-    }
+-    m->tables_ready = true;
+-}
++    zc_mailbox * mb(int il) const { return (zc_mailbox *) (h_mail + (size_t) il * mail_stride); }
++    float   * mb_x  (int il) const { return (float *)   ((char *) mb(il) + sizeof(zc_mailbox)); }
++    int32_t * mb_ids(int il) const { return (int32_t *) (mb_x(il) + (size_t) ZC_MAX_TOKENS * n_embd); }
++    float   * mb_out(int il) const { return (float *)   (mb_ids(il) + (size_t) ZC_MAX_TOKENS * n_used); }
++};
+ 
+-static void zc_set_entry(ggml_cuda_moe_zc * m, int key, int slot) {
+-    m->tables_dirty = true;
++static void zc_set_entry(ggml_cuda_moe_zc * m, int key, bool in_vram) {
+     const int il = key / m->n_expert;
+     const int e  = key % m->n_expert;
++    const int slot = m->slot_of[key];
+     for (int ti : m->layer_tensors[il]) {
+         const zc_tensor & z = m->tensors[ti];
+-        m->h_tables[(size_t) ti * m->n_expert + e] = slot < 0
+-            ? (const void *) ((const char *) z.t->data + (size_t) e * z.expert_stride)
+-            : (const void *) (m->d_slots + (size_t) slot * m->slot_bytes + z.slot_offset);
++        m->h_tables[(size_t) ti * m->n_expert + e] = in_vram
++            ? (const void *) (m->d_slots + (size_t) slot * m->slot_bytes + z.slot_offset) : nullptr;
+     }
++    m->published[key] = in_vram ? 1 : 0;
+ }
+ 
+-// evict the CRF victim: least recently used slot of the class list with the largest age/2^class,
+-// skipping experts selected in the current step
+ static bool zc_evict_one(ggml_cuda_moe_zc * m) {
+     zc_crf & p = m->policy;
+     int best = -1;
+@@ -197,15 +250,333 @@ static bool zc_evict_one(ggml_cuda_moe_zc * m) {
+     if (best < 0) return false;
+     const int key = m->key_of_slot[best];
+     p.unlink(best);
++    zc_set_entry(m, key, false);   // published before the next step starts: nobody reads the slot after that
+     m->slot_of[key] = -1;
+     m->key_of_slot[best] = -1;
+-    zc_set_entry(m, key, -1);
+-    // the token computed next may still read this slot via the old table entry
+-    m->quarantine.emplace_back(m->step + 1, best);
++    m->free_slots.push_back(best);
+     m->st_evictions++;
+     return true;
+ }
+ 
++// ------------------------------------------------------------------ CPU workers
++
++static void zc_barrier(ggml_cuda_moe_zc * m) {
++    const uint32_t gen = m->barrier_gen.load(std::memory_order_acquire);
++    if (m->barrier_count.fetch_add(1, std::memory_order_acq_rel) + 1 == (uint32_t) m->n_threads) {
++        m->barrier_count.store(0, std::memory_order_relaxed);
++        m->barrier_gen.fetch_add(1, std::memory_order_acq_rel);
++    } else {
++        while (m->barrier_gen.load(std::memory_order_acquire) == gen) { _mm_pause(); }
++    }
++}
++
++static inline float zc_silu(float x) { return x / (1.0f + std::exp(-x)); }
++
++// all threads run this for one job (one layer, its CPU experts)
++static void zc_job_part(ggml_cuda_moe_zc * m, int ith) {
++    const int nth = m->n_threads;
++    const int il = m->job_layer;
++    const int nm = (int) m->job_miss.size();
++    const zc_tensor & tg = m->tensors[m->layer_gate[il]];
++    const zc_tensor & tu = m->tensors[m->layer_up[il]];
++    const zc_tensor & td = m->tensors[m->layer_down[il]];
++    const auto * trg = ggml_get_type_traits_cpu(tg.t->type);
++    const auto * tru = ggml_get_type_traits_cpu(tu.t->type);
++    const auto * trd = ggml_get_type_traits_cpu(td.t->type);
++    const int n_ff = m->n_ff, n_embd = m->n_embd;
++
++    // phase 1: gate and up rows of all CPU experts -> h = silu(gate) * up
++    {
++        const int total = nm * n_ff;
++        const int per = (total + nth - 1) / nth;
++        const int r0 = ith * per, r1 = std::min(total, r0 + per);
++        for (int r = r0; r < r1; ++r) {
++            const int mi = r / n_ff, row = r % n_ff;
++            const auto & ms = m->job_miss[mi];
++            const char * xq = m->xq.data() + (size_t) ms.t * m->xq_row;
++            float g, u;
++            trg->vec_dot(n_embd, &g, 0, (const char *) tg.t->data + (size_t) ms.e * tg.expert_stride + (size_t) row * tg.row_bytes, 0, xq, 0, 1);
++            tru->vec_dot(n_embd, &u, 0, (const char *) tu.t->data + (size_t) ms.e * tu.expert_stride + (size_t) row * tu.row_bytes, 0, xq, 0, 1);
++            m->h[(size_t) mi * n_ff + row] = zc_silu(g) * u;
++        }
++    }
++    zc_barrier(m);
++    // phase 2: quantize h of each expert for the down projection
++    for (int mi = ith; mi < nm; mi += nth) {
++        m->tr_q8->from_float(m->h.data() + (size_t) mi * n_ff, m->hq.data() + (size_t) mi * m->hq_row, n_ff);
++    }
++    zc_barrier(m);
++    // phase 3: down rows -> mailbox out[t][k][:]
++    {
++        const int total = nm * n_embd;
++        const int per = (total + nth - 1) / nth;
++        const int r0 = ith * per, r1 = std::min(total, r0 + per);
++        float * out = m->mb_out(il);
++        for (int r = r0; r < r1; ++r) {
++            const int mi = r / n_embd, row = r % n_embd;
++            const auto & ms = m->job_miss[mi];
++            float v;
++            trd->vec_dot(n_ff, &v, 0, (const char *) td.t->data + (size_t) ms.e * td.expert_stride + (size_t) row * td.row_bytes, 0,
++                m->hq.data() + (size_t) mi * m->hq_row, 0, 1);
++            out[((size_t) ms.t * m->n_used + ms.k) * n_embd + row] = v;
++        }
++    }
++    zc_barrier(m);
++}
++
++static void zc_pin_thread(int ith) {
++#ifdef _WIN32
++    // one thread per P-core (Intel hybrid: P-cores have the highest EfficiencyClass)
++    static std::vector<DWORD_PTR> pmask = [] {
++        std::vector<DWORD_PTR> res;
++        DWORD len = 0;
++        GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
++        std::vector<char> buf(len);
++        if (!GetLogicalProcessorInformationEx(RelationProcessorCore, (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX) buf.data(), &len)) return res;
++        BYTE maxe = 0;
++        for (char * p = buf.data(); p < buf.data() + len; p += ((PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX) p)->Size)
++            maxe = std::max(maxe, ((PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX) p)->Processor.EfficiencyClass);
++        for (char * p = buf.data(); p < buf.data() + len; p += ((PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX) p)->Size) {
++            auto * r = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX) p;
++            if (r->Processor.EfficiencyClass == maxe) {
++                KAFFINITY mk = r->Processor.GroupMask[0].Mask;
++                res.push_back(mk & (~mk + 1));
++            }
++        }
++        return res;
++    }();
++    if (!pmask.empty()) {
++        SetThreadAffinityMask(GetCurrentThread(), pmask[ith % pmask.size()]);
++    }
++    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
++#else
++    GGML_UNUSED(ith);
++#endif
++}
++
++static void zc_worker(ggml_cuda_moe_zc * m, int ith) {
++    zc_pin_thread(ith);
++    if (ith == 0) {
++        // leader: watches the mailboxes of all layers
++        std::vector<uint32_t> seen(m->n_layer, 0);
++        while (!m->stop.load(std::memory_order_relaxed)) {
++            bool any = false;
++            for (int il = 0; il < m->n_layer; ++il) {
++                zc_mailbox * b = m->mb(il);
++                const uint32_t req = b->req;
++                if (req == seen[il]) continue;
++                any = true;
++                seen[il] = req;
++                std::atomic_thread_fence(std::memory_order_acquire);
++                // collect the experts this step must compute on the CPU
++                const int n_tokens = (int) b->n_tokens;
++                const int32_t * ids = m->mb_ids(il);
++                m->job_miss.clear();
++                for (int t = 0; t < n_tokens; ++t) {
++                    for (int k = 0; k < m->n_used; ++k) {
++                        const int e = ids[t * m->n_used + k];
++                        if (e >= 0 && e < m->n_expert && !m->published[il * m->n_expert + e]) {
++                            m->job_miss.push_back({ t, k, e });
++                        }
++                    }
++                }
++                if (!m->job_miss.empty() && m->layer_gate[il] >= 0) {
++                    for (int t = 0; t < n_tokens; ++t) {
++                        m->tr_q8->from_float(m->mb_x(il) + (size_t) t * m->n_embd, m->xq.data() + (size_t) t * m->xq_row, m->n_embd);
++                    }
++                    m->job_layer = il;
++                    m->st_cpu_jobs++;
++                    m->st_cpu_experts += (int64_t) m->job_miss.size();
++                    const auto t0 = std::chrono::steady_clock::now();
++                    m->job_gen.fetch_add(1, std::memory_order_release); // wake helpers
++                    zc_job_part(m, 0);
++                    m->st_cpu_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - t0).count();
++                }
++                std::atomic_thread_fence(std::memory_order_release);
++                b->done = req;
++            }
++            if (!any) _mm_pause();
++        }
++    } else {
++        uint32_t gen = m->job_gen.load();
++        while (!m->stop.load(std::memory_order_relaxed)) {
++            const uint32_t g = m->job_gen.load(std::memory_order_acquire);
++            if (g == gen) { _mm_pause(); continue; }
++            gen = g;
++            zc_job_part(m, ith);
++        }
++    }
++}
++
++static void zc_uploader(ggml_cuda_moe_zc * m) {
++#ifdef _WIN32
++    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
++#endif
++    ggml_cuda_set_device(m->device);
++    std::vector<std::pair<int, int>> work;
++    for (;;) {
++        {
++            std::unique_lock<std::mutex> lock(m->up_mutex);
++            // start only after the main thread launched the next token's graph: CUDA API calls from
++            // this thread would otherwise delay that launch (driver lock), serializing copy and compute
++            m->up_cv.wait(lock, [m] { return (m->up_has_work && m->up_go) || m->stop.load(); });
++            if (m->stop.load() && !m->up_has_work) return;
++            work.swap(m->up_list);
++            m->up_has_work = false;
++            m->up_go = false;
++        }
++        // all copies of the step in one driver call
++        std::vector<void *> dsts;
++        std::vector<const void *> srcs;
++        std::vector<size_t> sizes;
++        for (auto [key, slot] : work) {
++            const int il = key / m->n_expert, e = key % m->n_expert;
++            for (int ti : m->layer_tensors[il]) {
++                const zc_tensor & z = m->tensors[ti];
++                dsts.push_back(m->d_slots + (size_t) slot * m->slot_bytes + z.slot_offset);
++                srcs.push_back((const char *) z.t->data + (size_t) e * z.expert_stride);
++                sizes.push_back(z.expert_bytes);
++            }
++        }
++        if (!dsts.empty()) {
++            cudaMemcpyAttributes attr = {};
++            attr.srcAccessOrder = cudaMemcpySrcAccessOrderStream;
++            size_t attr_idx = 0;
++            CUDA_CHECK(cudaMemcpyBatchAsync(dsts.data(), srcs.data(), sizes.data(), dsts.size(), &attr, &attr_idx, 1, m->copy_stream));
++        }
++        CUDA_CHECK(cudaEventRecord(m->copy_done, m->copy_stream));
++        work.clear();
++        {
++            std::lock_guard<std::mutex> lock(m->up_mutex);
++            m->up_busy = false;
++        }
++        m->up_cv.notify_all();
++    }
++}
++
++// ------------------------------------------------------------------ GPU side of the mailbox
++
++static __global__ void k_zc_signal(zc_mailbox * b, uint32_t * seq, uint32_t n_tokens) {
++    const uint32_t s = ++(*seq);
++    b->n_tokens = n_tokens;
++    __threadfence_system();
++    b->req = s;
++    __threadfence_system();
++}
++
++// waits for the CPU, then copies the CPU experts' outputs into dst[:, k, t]
++static __global__ void k_zc_recv(const zc_mailbox * b, const uint32_t * seq, const float * out, const int32_t * ids,
++        int ids_stride, const void * const * table_down, float * dst, int dst_s1, int dst_s2, int n_embd, int n_used) {
++    const int k = blockIdx.x, t = blockIdx.y;
++    if (threadIdx.x == 0) {
++        const uint32_t s = *seq;
++        while (b->done < s) { }
++        __threadfence_system();
++    }
++    __syncthreads();
++    const int e = ids[t * ids_stride + k];
++    if (table_down[e] != nullptr) return;  // computed on the GPU
++    const float * src = out + ((size_t) t * n_used + k) * n_embd;
++    float * d = dst + (size_t) t * dst_s2 + (size_t) k * dst_s1;
++    for (int i = threadIdx.x; i < n_embd; i += blockDim.x) d[i] = src[i];
++}
++
++// ------------------------------------------------------------------ hooks used by mmvq.cu
++
++bool ggml_cuda_moe_zc_lookup(const void * data, ggml_cuda_moe_zc ** m, int * ti) {
++    std::lock_guard<std::mutex> lock(g_zc_mutex);
++    if (g_zc_reg.empty()) return false;
++    auto it = g_zc_reg.find(data);
++    if (it == g_zc_reg.end() || !it->second.m->tables_ready) return false;
++    *m = it->second.m;
++    *ti = it->second.ti;
++    return true;
++}
++
++const void * const * ggml_cuda_moe_zc_table(ggml_cuda_moe_zc * m, int ti) {
++    return m->d_tables + (size_t) ti * m->n_expert;
++}
++
++int ggml_cuda_moe_zc_max_tokens() { return ZC_MAX_TOKENS; }
++
++// before the up (or gate_up) projection of a layer: hand x and ids to the CPU
++void ggml_cuda_moe_zc_send(ggml_cuda_moe_zc * m, int ti, const float * x, size_t x_nb_token,
++        const int32_t * ids, size_t ids_nb_token, int n_tokens, cudaStream_t stream) {
++    const zc_tensor & z = m->tensors[ti];
++    if (z.role != ZC_UP && z.role != ZC_GATE_UP) return;
++    GGML_ASSERT(z.role == ZC_UP && "moe-zc: fused gate_up experts are not supported yet");
++    const int il = z.layer;
++    CUDA_CHECK(cudaMemcpy2DAsync(m->mb_x(il), m->n_embd * sizeof(float), x, x_nb_token, m->n_embd * sizeof(float), n_tokens,
++        cudaMemcpyDeviceToHost, stream));
++    CUDA_CHECK(cudaMemcpy2DAsync(m->mb_ids(il), m->n_used * sizeof(int32_t), ids, ids_nb_token, m->n_used * sizeof(int32_t), n_tokens,
++        cudaMemcpyDeviceToHost, stream));
++    zc_mailbox * d_mb = (zc_mailbox *) (m->d_mail + (size_t) il * m->mail_stride);
++    k_zc_signal<<<1, 1, 0, stream>>>(d_mb, m->d_seq + il, (uint32_t) n_tokens);
++}
++
++// after the down projection of a layer: wait for the CPU and merge its outputs
++void ggml_cuda_moe_zc_recv(ggml_cuda_moe_zc * m, int ti, float * dst, size_t dst_nb1, size_t dst_nb2,
++        const int32_t * ids, size_t ids_nb_token, int n_tokens, cudaStream_t stream) {
++    const zc_tensor & z = m->tensors[ti];
++    if (z.role != ZC_DOWN) return;
++    const int il = z.layer;
++    zc_mailbox * d_mb = (zc_mailbox *) (m->d_mail + (size_t) il * m->mail_stride);
++    float * d_out = (float *) (m->d_mail + ((char *) m->mb_out(il) - m->h_mail));
++    k_zc_recv<<<dim3(m->n_used, n_tokens), 256, 0, stream>>>(d_mb, m->d_seq + il, d_out, ids, (int) (ids_nb_token / sizeof(int32_t)),
++        ggml_cuda_moe_zc_table(m, ti), dst, (int) (dst_nb1 / sizeof(float)), (int) (dst_nb2 / sizeof(float)), m->n_embd, m->n_used);
++}
++
++// ------------------------------------------------------------------ setup / per-step update
++
++static void zc_finalize(ggml_cuda_moe_zc * m) {
++    const size_t n = m->tensors.size() * (size_t) m->n_expert;
++    CUDA_CHECK(cudaMallocHost((void **) &m->h_tables, n * sizeof(void *)));
++    CUDA_CHECK(cudaMalloc((void **) &m->d_tables, n * sizeof(void *)));
++    for (size_t i = 0; i < n; ++i) m->h_tables[i] = nullptr;
++    CUDA_CHECK(cudaMemcpy(m->d_tables, m->h_tables, n * sizeof(void *), cudaMemcpyHostToDevice));
++
++    // shapes from the first complete layer
++    m->layer_gate.assign(m->n_layer, -1);
++    m->layer_up.assign(m->n_layer, -1);
++    m->layer_down.assign(m->n_layer, -1);
++    for (size_t ti = 0; ti < m->tensors.size(); ++ti) {
++        const zc_tensor & z = m->tensors[ti];
++        if (z.role == ZC_GATE) m->layer_gate[z.layer] = (int) ti;
++        if (z.role == ZC_UP)   m->layer_up[z.layer]   = (int) ti;
++        if (z.role == ZC_DOWN) m->layer_down[z.layer] = (int) ti;
++        if (z.role == ZC_DOWN) { m->n_ff = (int) z.t->ne[0]; m->n_embd = (int) z.t->ne[1]; }
++    }
++    m->tr_q8 = ggml_get_type_traits_cpu(GGML_TYPE_Q8_K);
++    m->xq_row = ggml_row_size(GGML_TYPE_Q8_K, m->n_embd);
++    m->hq_row = ggml_row_size(GGML_TYPE_Q8_K, m->n_ff);
++    m->xq.resize((size_t) ZC_MAX_TOKENS * m->xq_row);
++    m->h.resize((size_t) ZC_MAX_TOKENS * m->n_used * m->n_ff);
++    m->hq.resize((size_t) ZC_MAX_TOKENS * m->n_used * m->hq_row);
++
++    // mailboxes
++    m->mail_stride = GGML_PAD(sizeof(zc_mailbox) + sizeof(float) * ZC_MAX_TOKENS * m->n_embd + sizeof(int32_t) * ZC_MAX_TOKENS * m->n_used
++        + sizeof(float) * ZC_MAX_TOKENS * m->n_used * m->n_embd, 4096);
++    CUDA_CHECK(cudaHostAlloc((void **) &m->h_mail, m->mail_stride * m->n_layer, cudaHostAllocMapped));
++    CUDA_CHECK(cudaHostGetDevicePointer((void **) &m->d_mail, m->h_mail, 0));
++    memset(m->h_mail, 0, m->mail_stride * m->n_layer);
++    CUDA_CHECK(cudaMalloc((void **) &m->d_seq, sizeof(uint32_t) * m->n_layer));
++    CUDA_CHECK(cudaMemset(m->d_seq, 0, sizeof(uint32_t) * m->n_layer));
++
++    {
++        std::lock_guard<std::mutex> lock(g_zc_mutex);
++        for (size_t ti = 0; ti < m->tensors.size(); ++ti) {
++            g_zc_reg[m->tensors[ti].t->data] = { m, (int) ti };
++        }
++    }
++    m->observed_req.assign(m->n_layer, 0);
++    ggml_cpu_init();
++    for (int i = 0; i < m->n_threads; ++i) {
++        m->workers.emplace_back(zc_worker, m, i);
++    }
++    m->uploader = std::thread(zc_uploader, m);
++    m->tables_ready = true;
++}
++
+ extern "C" {
+ 
+ ggml_cuda_moe_zc * ggml_cuda_moe_zc_create(int device, int n_layer, int n_expert, size_t slot_bytes, int n_slots) {
+@@ -220,77 +591,98 @@ ggml_cuda_moe_zc * ggml_cuda_moe_zc_create(int device, int n_layer, int n_expert
+     if (const char * s = getenv("LLAMA_MOE_ZC_RESERVE"))     m->reserve_slots = atoi(s);
+     if (const char * s = getenv("LLAMA_MOE_ZC_MAX_UPLOADS")) m->max_uploads_per_step = atoi(s);
+     if (const char * s = getenv("LLAMA_MOE_ZC_VERBOSE"))     m->verbose = atoi(s) != 0;
++    if (const char * s = getenv("LLAMA_MOE_ZC_THREADS"))     m->n_threads = std::max(1, atoi(s));
+     if (n_slots > 0) {
+         CUDA_CHECK(cudaMalloc((void **) &m->d_slots, (size_t) n_slots * m->slot_bytes));
+     }
+     CUDA_CHECK(cudaStreamCreateWithFlags(&m->copy_stream, cudaStreamNonBlocking));
+     CUDA_CHECK(cudaEventCreateWithFlags(&m->copy_done, cudaEventDisableTiming));
+-
+     const int n_keys = n_layer * n_expert;
+     m->slot_of.assign(n_keys, -1);
++    m->published.assign(n_keys, 0);
+     m->key_of_slot.assign(n_slots, -1);
+     m->used_step.assign(n_keys, -1);
+     m->policy.init(n_slots, n_keys);
+-    for (int s = n_slots - 1; s >= 0; --s) {
+-        m->free_slots.push_back(s);
+-    }
+-    GGML_LOG_INFO("%s: %d layers x %d experts, %d VRAM slots x %.2f MiB = %.2f MiB, CRF replacement, reserve %d\n",
+-        __func__, n_layer, n_expert, n_slots, m->slot_bytes / 1048576.0, n_slots * m->slot_bytes / 1048576.0, m->reserve_slots);
++    for (int s = n_slots - 1; s >= 0; --s) m->free_slots.push_back(s);
++    GGML_LOG_INFO("%s: %d layers x %d experts, %d VRAM slots x %.2f MiB = %.2f MiB, %d CPU threads\n",
++        __func__, n_layer, n_expert, n_slots, m->slot_bytes / 1048576.0, n_slots * m->slot_bytes / 1048576.0, m->n_threads);
+     return m;
+ }
+ 
+-// Registers one expert weight tensor (3D: [ne0, ne1, n_expert]) of a layer.
+-// Its data must be readable by the GPU (pinned host memory or VRAM).
+-// Parts of the same layer are packed one after another inside a slot.
+-void ggml_cuda_moe_zc_add_tensor(ggml_cuda_moe_zc * m, int layer, const ggml_tensor * t) {
++// role: 0 gate, 1 up, 2 down, 3 gate_up
++void ggml_cuda_moe_zc_add_tensor(ggml_cuda_moe_zc * m, int layer, int role, const ggml_tensor * t) {
+     GGML_ASSERT(!m->tables_ready && "register all tensors before the first step");
+     GGML_ASSERT(layer >= 0 && layer < m->n_layer && t->ne[2] == m->n_expert);
+     zc_tensor z;
+     z.t = t;
+     z.layer = layer;
+-    z.part = (int) m->layer_tensors[layer].size();
++    z.role = role;
+     z.expert_stride = t->nb[2];
+-    z.expert_bytes  = ggml_row_size(t->type, t->ne[0]) * t->ne[1];
++    z.row_bytes = ggml_row_size(t->type, t->ne[0]);
++    z.expert_bytes = z.row_bytes * t->ne[1];
+     size_t off = 0;
+-    for (int ti : m->layer_tensors[layer]) {
+-        off += GGML_PAD(m->tensors[ti].expert_bytes, 256);
+-    }
++    for (int ti : m->layer_tensors[layer]) off += GGML_PAD(m->tensors[ti].expert_bytes, 256);
+     z.slot_offset = off;
+     GGML_ASSERT(off + z.expert_bytes <= m->slot_bytes && "slot too small for the experts of this layer");
+     m->layer_tensors[layer].push_back((int) m->tensors.size());
+     m->tensors.push_back(z);
+ }
+ 
+-// Called after a decode step finished (GPU idle for this model), with the
+-// experts selected in every layer: ids[token][layer][k] (-1 = layer not computed).
+-// Updates the cache and starts background uploads; returns immediately.
++// after all tensors are registered: allocate tables and mailboxes, start the CPU workers
++void ggml_cuda_moe_zc_start(ggml_cuda_moe_zc * m, int n_used) {
++    ggml_cuda_set_device(m->device);
++    if (!m->tables_ready) {
++        m->n_used = n_used;
++        zc_finalize(m);
++    }
++}
++
++// Called after a step finished (GPU idle), with ids[token][layer][k] (-1 = layer not computed).
+ void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_tokens, int n_used) {
+     ggml_cuda_set_device(m->device);
+     if (!m->tables_ready) {
+-        zc_init_tables(m);
++        m->n_used = n_used;
++        zc_finalize(m);
++    }
++    // ids == nullptr: decode step (<= ZC_MAX_TOKENS tokens), read the experts from the mailboxes
++    // of the layers that ran in this step (no copy in the compute graph needed)
++    if (ids == nullptr) {
++        m->step_ids.assign((size_t) n_tokens * m->n_layer * n_used, -1);
++        for (int il = 0; il < m->n_layer; ++il) {
++            const zc_mailbox * b = m->mb(il);
++            const uint32_t req = b->req;
++            if (req == m->observed_req[il]) continue;
++            m->observed_req[il] = req;
++            const int nt = std::min<int>(n_tokens, (int) b->n_tokens);
++            const int32_t * mids = m->mb_ids(il);
++            for (int t = 0; t < nt; ++t) {
++                for (int k = 0; k < n_used; ++k) {
++                    m->step_ids[((size_t) t * m->n_layer + il) * n_used + k] = mids[t * m->n_used + k];
++                }
++            }
++        }
++        ids = m->step_ids.data();
+     }
+     m->step++;
+     m->st_steps++;
+-    m->st_tokens += n_tokens;
++    if (n_tokens <= ZC_MAX_TOKENS) m->st_tokens += n_tokens; // generation tokens only
+     zc_crf & p = m->policy;
+ 
+-    // 1. previous uploads + table writes must be finished before we touch the
+-    //    host table mirror again or reuse quarantined slots (usually long done)
++    // 1. uploads started during the last step are complete: they become visible now
++    {
++        std::unique_lock<std::mutex> lock(m->up_mutex);
++        m->up_cv.wait(lock, [m] { return !m->up_busy; });
++    }
+     if (m->copy_pending) {
+         CUDA_CHECK(cudaEventSynchronize(m->copy_done));
+         m->copy_pending = false;
+     }
+-    for (size_t i = 0; i < m->quarantine.size();) {
+-        if (m->quarantine[i].first <= m->step) {
+-            m->free_slots.push_back(m->quarantine[i].second);
+-            m->quarantine[i] = m->quarantine.back();
+-            m->quarantine.pop_back();
+-        } else {
+-            ++i;
+-        }
++    for (int key : m->pending) {
++        if (m->slot_of[key] >= 0) zc_set_entry(m, key, true);
+     }
++    m->pending.clear();
+ 
+-    // 2. distinct experts of this step: update CRF, refresh hits, collect misses
++    // 2. CRF bookkeeping for the experts of this step, collect misses
+     std::vector<int> misses;
+     for (int tok = 0; tok < n_tokens; ++tok) {
+         for (int il = 0; il < m->n_layer; ++il) {
+@@ -298,89 +690,117 @@ void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_t
+                 const int e = ids[((size_t) tok * m->n_layer + il) * n_used + k];
+                 if (e < 0 || e >= m->n_expert) continue;
+                 const int key = il * m->n_expert + e;
+-                if (m->slot_of[key] >= 0) m->st_hits++; else m->st_misses++;
+-                if (m->used_step[key] == m->step) continue; // already handled in this step
++                if (n_tokens <= ZC_MAX_TOKENS) { if (m->published[key]) m->st_hits++; else m->st_misses++; }
++                if (m->used_step[key] == m->step) continue;
+                 m->used_step[key] = m->step;
+                 p.use(key);
+-                if (m->slot_of[key] >= 0) {
+-                    p.push(m->slot_of[key], p.class_of(key));
+-                } else {
+-                    misses.push_back(key);
+-                }
++                if (m->slot_of[key] >= 0) p.push(m->slot_of[key], p.class_of(key));
++                else misses.push_back(key);
+             }
+         }
+     }
+     p.clock += n_tokens;
+-    if (m->n_slots == 0) {
+-        return;
+-    }
+ 
+-    // 3. every miss gets a free slot (if any) and is uploaded in the background;
+-    //    consecutive keys tend to get consecutive slots
+-    std::sort(misses.begin(), misses.end());
+-    int uploads = 0;
+-    for (int key : misses) {
+-        if (uploads >= m->max_uploads_per_step || m->free_slots.empty()) {
+-            m->st_no_slot++;
+-            continue;
++    if (m->n_slots > 0) {
++        // 3. make room, then give misses free slots and upload them during the next token
++        std::sort(misses.begin(), misses.end());
++        const int max_up = n_tokens > ZC_MAX_TOKENS ? std::max(m->max_uploads_per_step, 16 * n_tokens) : m->max_uploads_per_step;
++        const int want = std::min((int) misses.size(), max_up);
++        while ((int) m->free_slots.size() < std::max(want, m->reserve_slots)) {
++            if (!zc_evict_one(m)) break;
++        }
++        int uploads = 0;
++        std::vector<std::pair<int, int>> todo;
++        for (int key : misses) {
++            if (uploads >= max_up || m->free_slots.empty()) { m->st_no_slot++; continue; }
++            const int slot = m->free_slots.back();
++            m->free_slots.pop_back();
++            todo.emplace_back(key, slot);
++            m->slot_of[key] = slot;
++            m->key_of_slot[slot] = key;
++            p.push(slot, p.class_of(key));
++            m->pending.push_back(key);
++            uploads++;
++            m->st_uploads++;
+         }
+-        const int slot = m->free_slots.back();
+-        m->free_slots.pop_back();
+-        const int il = key / m->n_expert;
+-        const int e  = key % m->n_expert;
+-        for (int ti : m->layer_tensors[il]) {
+-            const zc_tensor & z = m->tensors[ti];
+-            CUDA_CHECK(cudaMemcpyAsync(m->d_slots + (size_t) slot * m->slot_bytes + z.slot_offset,
+-                (const char *) z.t->data + (size_t) e * z.expert_stride, z.expert_bytes,
+-                cudaMemcpyDefault, m->copy_stream));
++        if (uploads > 0) {
++            // the uploader thread issues the copies while the next token is already computed
++            {
++                std::lock_guard<std::mutex> lock(m->up_mutex);
++                m->up_list.swap(todo);
++                m->up_has_work = true;
++                m->up_busy = true;
++            }
++            m->up_cv.notify_all();
++            m->copy_pending = true;
+         }
+-        m->slot_of[key] = slot;
+-        m->key_of_slot[slot] = key;
+-        p.push(slot, p.class_of(key));
+-        zc_set_entry(m, key, slot);
+-        uploads++;
+-        m->st_uploads++;
+     }
+ 
+-    // 4. keep slots ready for the next step: evict CRF victims into quarantine
+-    while ((int) (m->free_slots.size() + m->quarantine.size()) < m->reserve_slots) {
+-        if (!zc_evict_one(m)) break;
++    // experiment (LLAMA_MOE_ZC_SYNC=1): wait for the uploads now, so experts missed by this step
++    // are already in VRAM for the next one (llama.cpp's hit semantics), at the cost of a stall
++    static const bool sync_uploads = getenv("LLAMA_MOE_ZC_SYNC") && atoi(getenv("LLAMA_MOE_ZC_SYNC")) != 0;
++    if (sync_uploads && m->copy_pending) {
++        {
++            std::unique_lock<std::mutex> lock(m->up_mutex);
++            m->up_go = true;
++            m->up_cv.notify_all();
++            m->up_cv.wait(lock, [m] { return !m->up_busy; });
++        }
++        CUDA_CHECK(cudaEventSynchronize(m->copy_done));
++        m->copy_pending = false;
++        for (int key : m->pending) {
++            if (m->slot_of[key] >= 0) zc_set_entry(m, key, true);
++        }
++        m->pending.clear();
+     }
+ 
+-    // 5. publish the table (after the data uploads on the same stream)
+-    if (m->tables_dirty) {
+-        m->tables_dirty = false;
+-        const size_t n = m->tensors.size() * (size_t) m->n_expert;
+-        CUDA_CHECK(cudaMemcpyAsync((void *) m->d_tables, m->h_tables, n * sizeof(void *), cudaMemcpyHostToDevice, m->copy_stream));
+-        CUDA_CHECK(cudaEventRecord(m->copy_done, m->copy_stream));
+-        m->copy_pending = true;
+-    }
++    // 4. publish the table for the next step (GPU is idle: plain synchronous copy)
++    const size_t n = m->tensors.size() * (size_t) m->n_expert;
++    CUDA_CHECK(cudaMemcpy((void *) m->d_tables, m->h_tables, n * sizeof(void *), cudaMemcpyHostToDevice));
++    std::atomic_thread_fence(std::memory_order_release);
+ 
+     if (m->verbose && m->st_steps % 64 == 0) {
+-        GGML_LOG_INFO("moe_zc: steps %lld tokens %lld | hit %.1f%% | misses/token %.1f | uploads/step %.1f | no-slot %lld\n",
++        GGML_LOG_INFO("moe_zc: steps %lld tokens %lld | VRAM hit %.1f%% | CPU experts/token %.1f (%.1f us/expert) | uploads/step %.1f\n",
+             (long long) m->st_steps, (long long) m->st_tokens,
+             100.0 * m->st_hits / std::max<int64_t>(1, m->st_hits + m->st_misses),
+-            (double) m->st_misses / std::max<int64_t>(1, m->st_tokens), (double) m->st_uploads / m->st_steps,
+-            (long long) m->st_no_slot);
++            (double) m->st_cpu_experts.load() / std::max<int64_t>(1, m->st_tokens),
++            m->st_cpu_ns.load() / 1000.0 / std::max<int64_t>(1, m->st_cpu_experts.load()), (double) m->st_uploads / m->st_steps);
++    }
++}
++
++// the main thread has launched a compute graph: background uploads may start now
++void ggml_cuda_moe_zc_launched(ggml_cuda_moe_zc * m) {
++    {
++        std::lock_guard<std::mutex> lock(m->up_mutex);
++        if (!m->up_has_work) return;
++        m->up_go = true;
+     }
++    m->up_cv.notify_all();
+ }
+ 
+ void ggml_cuda_moe_zc_free(ggml_cuda_moe_zc * m) {
+     if (!m) return;
+-    GGML_LOG_INFO("moe_zc: total steps %lld tokens %lld | hit %.2f%% | misses/token %.2f | uploads %lld (%.2f/step) | evictions %lld\n",
++    GGML_LOG_INFO("moe_zc: steps %lld tokens %lld | VRAM hit %.2f%% | CPU experts %lld (%.2f/token, %.1f us/expert) | uploads %lld (%.2f/step) | evictions %lld\n",
+         (long long) m->st_steps, (long long) m->st_tokens,
+         100.0 * m->st_hits / std::max<int64_t>(1, m->st_hits + m->st_misses),
+-        (double) m->st_misses / std::max<int64_t>(1, m->st_tokens),
++        (long long) m->st_cpu_experts.load(), (double) m->st_cpu_experts.load() / std::max<int64_t>(1, m->st_tokens),
++        m->st_cpu_ns.load() / 1000.0 / std::max<int64_t>(1, m->st_cpu_experts.load()),
+         (long long) m->st_uploads, (double) m->st_uploads / std::max<int64_t>(1, m->st_steps), (long long) m->st_evictions);
++    m->stop = true;
++    for (auto & w : m->workers) w.join();
++    m->up_cv.notify_all();
++    if (m->uploader.joinable()) m->uploader.join();
+     {
+         std::lock_guard<std::mutex> lock(g_zc_mutex);
+-        for (auto & z : m->tensors) g_zc_tables.erase(z.t->data);
++        for (auto & z : m->tensors) g_zc_reg.erase(z.t->data);
+     }
+     if (m->copy_stream) { cudaStreamSynchronize(m->copy_stream); cudaStreamDestroy(m->copy_stream); }
+     if (m->copy_done) cudaEventDestroy(m->copy_done);
+     if (m->d_slots) cudaFree(m->d_slots);
+     if (m->d_tables) cudaFree((void *) m->d_tables);
+     if (m->h_tables) cudaFreeHost((void *) m->h_tables);
++    if (m->h_mail) cudaFreeHost(m->h_mail);
++    if (m->d_seq) cudaFree(m->d_seq);
+     delete m;
+ }
+ 
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index 713cb0a3c..dfda78b91 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -2978,6 +2978,7 @@ ggml_status llama_context::graph_compute(
+     copy_experts.reset();
+ 
+     auto status = ggml_backend_sched_graph_compute_async(sched.get(), gf);
++    llama_moe_zc_launched(model); // [moe-zc] background expert uploads overlap with this graph
+     if (status != GGML_STATUS_SUCCESS) {
+         LLAMA_LOG_ERROR("%s: ggml_backend_sched_graph_compute_async failed with error %d\n", __func__, status);
+     }
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index 2ef9c130b..f9a6c3d5e 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -2364,11 +2364,16 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     cb(selected_experts, "ffn_moe_topk", il);
+ 
+     // [moe-zc] hand the selected experts of this layer to the zero-copy expert cache (llama-moe-zc.cpp)
+-    if (model.moe_zc_ids && il >= 0 && il < model.moe_zc_ids->ne[2] && n_tokens <= model.moe_zc_ids->ne[1] &&
++    // (steps of <= LLAMA_MOE_ZC_HYBRID_TOKENS tokens report their experts through the GPU<->CPU mailboxes instead,
++    //  so the top-k fusion of the CUDA backend is not broken on the hot path)
++    if (model.moe_zc_ids && il >= 0 && il < model.moe_zc_ids->ne[2] && n_tokens > 4 &&
+         selected_experts->ne[0] == model.moe_zc_ids->ne[0]) {
+-        ggml_tensor * dst = ggml_view_2d(ctx0, model.moe_zc_ids, selected_experts->ne[0], n_tokens,
++        const int64_t n_cap = std::min<int64_t>(n_tokens, model.moe_zc_ids->ne[1]); // the last n_cap tokens
++        ggml_tensor * src = ggml_view_2d(ctx0, selected_experts, selected_experts->ne[0], n_cap,
++            selected_experts->nb[1], (n_tokens - n_cap) * selected_experts->nb[1]);
++        ggml_tensor * dst = ggml_view_2d(ctx0, model.moe_zc_ids, selected_experts->ne[0], n_cap,
+             model.moe_zc_ids->nb[1], il * model.moe_zc_ids->nb[2]);
+-        ggml_build_forward_expand(gf, ggml_cpy(ctx0, selected_experts, dst));
++        ggml_build_forward_expand(gf, ggml_cpy(ctx0, src, dst));
+         res->moe_zc_layers.push_back(il);
+     }
+ 
+diff --git a/src/llama-moe-zc.cpp b/src/llama-moe-zc.cpp
+index a6b832fe3..360912f38 100644
+--- a/src/llama-moe-zc.cpp
++++ b/src/llama-moe-zc.cpp
+@@ -30,9 +30,11 @@
+ 
+ typedef ggml_backend_buffer_t (*fn_from_host_t)(int, void *, size_t);
+ typedef struct ggml_cuda_moe_zc * (*fn_create_t)(int, int, int, size_t, int);
+-typedef void (*fn_add_t)(struct ggml_cuda_moe_zc *, int, const ggml_tensor *);
++typedef void (*fn_add_t)(struct ggml_cuda_moe_zc *, int, int, const ggml_tensor *);
++typedef void (*fn_start_t)(struct ggml_cuda_moe_zc *, int);
+ typedef void (*fn_observe_t)(struct ggml_cuda_moe_zc *, const int32_t *, int, int);
+ typedef void (*fn_free_t)(struct ggml_cuda_moe_zc *);
++typedef void (*fn_launched_t)(struct ggml_cuda_moe_zc *);
+ 
+ static void * zc_proc(const char * name) {
+     ggml_backend_reg_t reg = ggml_backend_reg_by_name("CUDA");
+@@ -49,7 +51,8 @@ void llama_moe_zc_attach(llama_model & model) {
+     auto from_host = (fn_from_host_t) zc_proc("ggml_backend_cuda_buffer_from_host_ptr");
+     auto create    = (fn_create_t)    zc_proc("ggml_cuda_moe_zc_create");
+     auto add       = (fn_add_t)       zc_proc("ggml_cuda_moe_zc_add_tensor");
+-    if (!from_host || !create || !add) {
++    auto start     = (fn_start_t)     zc_proc("ggml_cuda_moe_zc_start");
++    if (!from_host || !create || !add || !start) {
+         LLAMA_LOG_WARN("%s: CUDA backend without moe-zc support, disabled\n", __func__);
+         return;
+     }
+@@ -63,11 +66,14 @@ void llama_moe_zc_attach(llama_model & model) {
+ 
+     // collect expert tensors per layer and check they are plain host memory
+     std::vector<std::vector<ggml_tensor *>> per_layer(n_layer);
++    std::vector<std::vector<int>> roles(n_layer);
+     size_t slot_bytes = 0;
+     for (int il = 0; il < n_layer; ++il) {
+         const auto & l = model.layers[il];
+         size_t bytes = 0;
+-        for (ggml_tensor * t : { l.ffn_gate_exps, l.ffn_up_exps, l.ffn_down_exps, l.ffn_gate_up_exps }) {
++        ggml_tensor * const parts[4] = { l.ffn_gate_exps, l.ffn_up_exps, l.ffn_down_exps, l.ffn_gate_up_exps };
++        for (int role = 0; role < 4; ++role) {
++            ggml_tensor * t = parts[role];
+             if (t == nullptr) {
+                 continue;
+             }
+@@ -81,6 +87,7 @@ void llama_moe_zc_attach(llama_model & model) {
+                 return;
+             }
+             per_layer[il].push_back(t);
++            roles[il].push_back(role);
+             bytes += GGML_PAD(ggml_row_size(t->type, t->ne[0]) * t->ne[1], 256);
+         }
+         slot_bytes = std::max(slot_bytes, bytes);
+@@ -105,10 +112,11 @@ void llama_moe_zc_attach(llama_model & model) {
+     const int n_slots = (int) (mib * 1048576.0 / GGML_PAD(slot_bytes, 256));
+     model.moe_zc = create(0, n_layer, n_expert, slot_bytes, n_slots);
+     for (int il = 0; il < n_layer; ++il) {
+-        for (ggml_tensor * t : per_layer[il]) {
+-            add(model.moe_zc, il, t);
++        for (size_t i = 0; i < per_layer[il].size(); ++i) {
++            add(model.moe_zc, il, roles[il][i], per_layer[il][i]);
+         }
+     }
++    start(model.moe_zc, n_used); // before the first graph is captured
+ 
+     // 3. VRAM tensor that receives the selected expert ids of each layer: [n_used, 8 tokens, n_layer]
+     ggml_init_params ip = { ggml_tensor_overhead() * 2, nullptr, true };
+@@ -142,7 +150,7 @@ void llama_moe_zc_detach(llama_model & model) {
+ }
+ 
+ void llama_moe_zc_after_compute(const llama_model & model, ggml_backend_sched_t sched, const std::vector<int> & layers, int n_tokens) {
+-    if (!model.moe_zc || layers.empty() || n_tokens > LLAMA_MOE_ZC_MAX_TOKENS) {
++    if (!model.moe_zc) {
+         return;
+     }
+     static fn_observe_t observe = (fn_observe_t) zc_proc("ggml_cuda_moe_zc_observe");
+@@ -151,6 +159,14 @@ void llama_moe_zc_after_compute(const llama_model & model, ggml_backend_sched_t
+     const int n_layer = (int) t->ne[2];
+ 
+     ggml_backend_sched_synchronize(sched);
++    if (n_tokens <= LLAMA_MOE_ZC_HYBRID_TOKENS) {
++        observe(model.moe_zc, nullptr, n_tokens, n_used); // the experts are read from the GPU<->CPU mailboxes
++        return;
++    }
++    if (layers.empty()) {
++        return;
++    }
++    n_tokens = std::min(n_tokens, LLAMA_MOE_ZC_MAX_TOKENS); // the graph copied the ids of the last tokens
+     std::vector<int32_t> raw(ggml_nelements(t));
+     ggml_backend_tensor_get(t, raw.data(), 0, ggml_nbytes(t));
+ 
+@@ -166,3 +182,11 @@ void llama_moe_zc_after_compute(const llama_model & model, ggml_backend_sched_t
+     }
+     observe(model.moe_zc, ids.data(), n_tokens, n_used);
+ }
++
++void llama_moe_zc_launched(const llama_model & model) {
++    if (!model.moe_zc) {
++        return;
++    }
++    static fn_launched_t launched = (fn_launched_t) zc_proc("ggml_cuda_moe_zc_launched");
++    launched(model.moe_zc);
++}
+diff --git a/src/llama-moe-zc.h b/src/llama-moe-zc.h
+index 0f5340736..2782c8b1d 100644
+--- a/src/llama-moe-zc.h
++++ b/src/llama-moe-zc.h
+@@ -8,9 +8,14 @@
+ 
+ struct llama_model;
+ 
+-// max tokens per step whose expert ids are observed (decode + speculative verification)
+-#define LLAMA_MOE_ZC_MAX_TOKENS 8
++// max tokens per step whose expert ids are observed; for larger batches (prompt processing) the last
++// LLAMA_MOE_ZC_MAX_TOKENS tokens are observed, which warms the VRAM cache before generation starts
++#define LLAMA_MOE_ZC_MAX_TOKENS 64
++// steps up to this many tokens run hybrid (GPU + CPU experts) and report their experts through the mailboxes
++#define LLAMA_MOE_ZC_HYBRID_TOKENS 4
+ 
+ void llama_moe_zc_attach(llama_model & model);
+ void llama_moe_zc_detach(llama_model & model);
+ void llama_moe_zc_after_compute(const llama_model & model, ggml_backend_sched_t sched, const std::vector<int> & layers, int n_tokens);
++// a compute graph was launched: background uploads may start (they then overlap with the computation)
++void llama_moe_zc_launched(const llama_model & model);
+-- 
+2.45.2.windows.1
+

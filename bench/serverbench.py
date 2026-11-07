@@ -132,7 +132,7 @@ def main() -> None:
     log_path = logdir / f"{stamp}_{a.tag}.jsonl"
     srv_log = logdir / f"{stamp}_{a.tag}.server.log"
 
-    cmd = [a.server, "-m", a.model, "--port", str(a.port), "-c", str(a.ctx), "-np", "1",
+    cmd = [str(pathlib.Path(a.server).resolve()), "-m", str(pathlib.Path(a.model).resolve()), "--port", str(a.port), "-c", str(a.ctx), "-np", "1",
            "--no-webui", "--metrics"] + extra
     vram_before = vram_free_mib()
     t_start = time.time()
