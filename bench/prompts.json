@@ -1,5 +1,9 @@
 [
  {
+  "id": "warmup",
+  "prompt": "<|im_start|>user\nWrite a short story about a lighthouse keeper who finds a message in a bottle.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
   "id": "short0",
   "prompt": "<|im_start|>user\nExplain in simple terms how a hash map works and when it is a bad choice.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
  },
@@ -14,6 +18,22 @@
  {
   "id": "short3",
   "prompt": "<|im_start|>user\nList the planets of the solar system with one interesting fact about each.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "id": "short4",
+  "prompt": "<|im_start|>user\nSolve step by step: a train leaves at 9:40 at 72 km/h, another at 10:15 at 90 km/h from the same station in the same direction. When does the second catch up?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "id": "short5",
+  "prompt": "<|im_start|>user\nWrite a Python script that walks a directory tree and reports the 10 largest files, with argparse options.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "id": "short6",
+  "prompt": "<|im_start|>user\nНапиши вежливое письмо коллеге с просьбой перенести совещание на следующую неделю, объясни причину.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "id": "short7",
+  "prompt": "<|im_start|>user\nCompare TCP and UDP: guarantees, typical use cases, and what happens on packet loss.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
  },
  {
   "id": "long16k",

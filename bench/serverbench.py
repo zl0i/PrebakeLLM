@@ -55,6 +55,54 @@ def wait_ready(base: str, proc: subprocess.Popen, timeout: float = 600) -> None:
     raise TimeoutError("server did not become ready")
 
 
+# llama-server only handles Ctrl+C for a clean shutdown (which prints e.g. MoE
+# cache hit statistics). On Windows a Ctrl+C can only be sent to a whole
+# console, so the server runs in its own hidden console and a tiny helper
+# process attaches to it and raises Ctrl+C there.
+_CTRL_C_HELPER = (
+    "import ctypes,sys;k=ctypes.windll.kernel32;k.FreeConsole();"
+    "k.AttachConsole(int(sys.argv[1])) or sys.exit(1);"
+    "k.SetConsoleCtrlHandler(None,True);k.GenerateConsoleCtrlEvent(0,0)"
+)
+
+
+# Processes inherit "ignore Ctrl+C" from their parent (e.g. a shell running us
+# in the background). This wrapper re-enables Ctrl+C, then runs the server, so
+# the server inherits the enabled state; the wrapper itself waits it out.
+_CTRL_C_WRAPPER = (
+    "import ctypes,subprocess,sys;ctypes.windll.kernel32.SetConsoleCtrlHandler(None,False);"
+    "p=subprocess.Popen(sys.argv[1:])\n"
+    "while True:\n"
+    " try: sys.exit(p.wait())\n"
+    " except KeyboardInterrupt: pass"
+)
+
+
+def start_server(cmd, log_file) -> subprocess.Popen:
+    if sys.platform != "win32":
+        return subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT)
+    cmd = [sys.executable, "-c", _CTRL_C_WRAPPER] + list(cmd)
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = 0  # SW_HIDE
+    return subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT,
+                            creationflags=subprocess.CREATE_NEW_CONSOLE, startupinfo=si)
+
+
+def stop_server(proc: subprocess.Popen) -> None:
+    if proc.poll() is not None:
+        return
+    if sys.platform == "win32":
+        subprocess.run([sys.executable, "-c", _CTRL_C_HELPER, str(proc.pid)])
+    else:
+        proc.send_signal(2)
+    try:
+        proc.wait(timeout=60)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", required=True)
@@ -70,6 +118,8 @@ def main() -> None:
     extra = [x for x in a.server_args if x != "--"]
 
     prompts = json.loads((ROOT / "bench" / "prompts.json").read_text(encoding="utf-8"))
+    warmup = next(p for p in prompts if p["id"] == "warmup")
+    prompts = [p for p in prompts if p["id"] != "warmup"]
     if a.only:
         keep = set(a.only.split(","))
         prompts = [p for p in prompts if p["id"] in keep]
@@ -85,14 +135,16 @@ def main() -> None:
     vram_before = vram_free_mib()
     t_start = time.time()
     with open(srv_log, "w", encoding="utf-8") as slog:
-        proc = subprocess.Popen(cmd, stdout=slog, stderr=subprocess.STDOUT)
+        proc = start_server(cmd, slog)
         base = f"http://127.0.0.1:{a.port}"
         try:
             wait_ready(base, proc)
             load_s = time.time() - t_start
             vram_loaded = vram_free_mib()
             print(f"[{a.tag}] loaded in {load_s:.1f}s, VRAM free {vram_before} -> {vram_loaded} MiB")
-            post(base + "/completion", {"prompt": "Hello", "n_predict": 8, "temperature": 0})  # warmup
+            # warmup: long enough to touch most experts, so mmap'ed weights are paged in
+            post(base + "/completion", {"prompt": warmup["prompt"], "n_predict": 128, "temperature": 0,
+                                        "ignore_eos": True, "cache_prompt": False})
 
             header = {"kind": "header", "tag": a.tag, "cmd": cmd, "load_s": load_s,
                       "vram_free_before_mib": vram_before, "vram_free_loaded_mib": vram_loaded,
@@ -100,8 +152,9 @@ def main() -> None:
             results = {}
             with open(log_path, "w", encoding="utf-8") as log:
                 log.write(json.dumps(header, ensure_ascii=False) + "\n")
-                for p in prompts:
-                    for rep in range(a.reps):
+                # round-robin over prompts, so a repeat never directly follows the same prompt
+                for rep in range(a.reps):
+                    for p in prompts:
                         body = {"prompt": p["prompt"], "n_predict": a.n_predict, "temperature": 0, "top_k": 1,
                                 "ignore_eos": True, "cache_prompt": False, "return_tokens": True, "seed": 1}
                         t0 = time.time()
@@ -122,11 +175,11 @@ def main() -> None:
                 f"{k}={statistics.median(x['predicted_per_second'] for x in v):.2f}" for k, v in results.items()))
             print(f"log: {log_path}")
         finally:
-            proc.terminate()
-            try:
-                proc.wait(timeout=30)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+            stop_server(proc)
+    # surface engine statistics printed at shutdown (e.g. MoE cache hit rate)
+    for line in open(srv_log, encoding="utf-8", errors="replace"):
+        if "llama_moe_cache:" in line:
+            print("  " + line.strip())
 
 
 if __name__ == "__main__":

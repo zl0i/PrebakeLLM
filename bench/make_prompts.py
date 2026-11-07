@@ -26,7 +26,15 @@ short = [
     "Write a C++ function that parses an IPv4 address string into a uint32_t, with error handling.",
     "Кратко перескажи сюжет романа «Мастер и Маргарита» и назови три главные темы.",
     "List the planets of the solar system with one interesting fact about each.",
+    "Solve step by step: a train leaves at 9:40 at 72 km/h, another at 10:15 at 90 km/h from the same station in the same direction. When does the second catch up?",
+    "Write a Python script that walks a directory tree and reports the 10 largest files, with argparse options.",
+    "Напиши вежливое письмо коллеге с просьбой перенести совещание на следующую неделю, объясни причину.",
+    "Compare TCP and UDP: guarantees, typical use cases, and what happens on packet loss.",
 ]
+
+# Warmup text, deliberately unlike the test prompts, so caches that learn from
+# usage (e.g. llama.cpp --moe-cache-mib) are not pre-filled with test content.
+warmup = chat("Write a short story about a lighthouse keeper who finds a message in a bottle.")
 
 # Long context: concatenate docs until ~64K characters (~16K tokens).
 parts, total = [], 0
@@ -38,7 +46,8 @@ for f in sorted(DOCS.rglob("*.md")):
         break
 long_doc = "".join(parts)[:64_000]
 
-prompts = [{"id": f"short{i}", "prompt": chat(p)} for i, p in enumerate(short)]
+prompts = [{"id": "warmup", "prompt": warmup}]
+prompts += [{"id": f"short{i}", "prompt": chat(p)} for i, p in enumerate(short)]
 prompts.append({"id": "long16k", "prompt": chat(
     "Below is documentation of a software project.\n" + long_doc +
     "\n\nSummarize the main build options described above as a bulleted list.")})
