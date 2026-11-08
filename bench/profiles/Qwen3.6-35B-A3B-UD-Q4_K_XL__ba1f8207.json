@@ -1,0 +1,321 @@
+{
+ "model": "D:\\Projects\\Work\\ai\\models\\qwen36mtp\\Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+ "model_fingerprint": "6d33c7beb475",
+ "hardware": {
+  "gpu": "NVIDIA GeForce RTX 4070 SUPER",
+  "vram_mib": 12282,
+  "driver": "621.01",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-13700KF",
+  "ram_gib": 63
+ },
+ "power_plan": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+ "model_info": {
+  "n_expert": 256,
+  "size_mib": 21794,
+  "tokenizer": "qwen35:248320:3efeb133134b"
+ },
+ "engine": "d403f38045a0",
+ "built": "2026-11-08 11:06:36",
+ "build_seconds": 365,
+ "fixed_vram_mib": 2826,
+ "config": {
+  "mode": "moe-zc",
+  "mtp_file": "embedded",
+  "draft_type": "mtp",
+  "draft_n": 2,
+  "cpu_threads": 6,
+  "ctx": 20480,
+  "cache_mib": 7175
+ },
+ "expected_tg": 90.1,
+ "trials": [
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 0,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7987
+   },
+   "tg": 82.98742615201667,
+   "tg_all": [
+    83.1682608993575,
+    84.7225071467964,
+    82.80659140467581,
+    81.47123732263994,
+    80.9552103842623,
+    83.91989292032783
+   ],
+   "vram_free_before": 11517,
+   "vram_free_loaded": 702,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 0,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7475
+   },
+   "tg": 83.05218937395777,
+   "tg_all": [
+    83.07444410657354,
+    84.96226660090551,
+    81.87663302687099,
+    80.30436870917545,
+    84.5055151806983,
+    83.02993464134201
+   ],
+   "vram_free_before": 11520,
+   "vram_free_loaded": 1221,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 1,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7687
+   },
+   "tg": 81.11666506968061,
+   "tg_all": [
+    81.58465100241366,
+    83.87137612355995,
+    78.74616298177547,
+    76.34276846726767,
+    85.84080256291483,
+    80.64867913694754
+   ],
+   "vram_free_before": 11524,
+   "vram_free_loaded": 773,
+   "load_s": 7.2,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 1,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7175
+   },
+   "tg": 80.20576667220121,
+   "tg_all": [
+    79.80741817480936,
+    84.34937191547874,
+    79.5019080457931,
+    75.29257558380158,
+    81.79677154830485,
+    80.60411516959307
+   ],
+   "vram_free_before": 11583,
+   "vram_free_loaded": 1338,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7687
+   },
+   "tg": 38.16050254222087,
+   "tg_all": [
+    42.36401882667654,
+    35.949662333187355,
+    38.232191553378755,
+    41.61375525668097,
+    37.483751147497856,
+    38.08881353106298
+   ],
+   "vram_free_before": 11579,
+   "vram_free_loaded": 763,
+   "load_s": 7.2,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7175
+   },
+   "tg": 88.34642542054323,
+   "tg_all": [
+    93.47305301215442,
+    86.29003328407384,
+    86.63929446189643,
+    84.66038937389648,
+    90.30889048428284,
+    90.05355637919003
+   ],
+   "vram_free_before": 11579,
+   "vram_free_loaded": 1273,
+   "load_s": 7.2,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7687
+   },
+   "tg": 19.30332414392057,
+   "tg_all": [
+    19.893792173431827,
+    17.636574750902792,
+    18.819015632920777,
+    21.055846062960686,
+    19.787632654920362,
+    18.39195121945577
+   ],
+   "vram_free_before": 11579,
+   "vram_free_loaded": 701,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7175
+   },
+   "tg": 83.92370575561915,
+   "tg_all": [
+    92.99888050404223,
+    84.39432211985799,
+    81.72500409910005,
+    83.4530893913803,
+    97.76565510982343,
+    83.34062782224649
+   ],
+   "vram_free_before": 11579,
+   "vram_free_loaded": 1211,
+   "load_s": 7.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 4,
+    "ctx": 20480,
+    "cache_mib": 7175
+   },
+   "tg": 84.57849329044504,
+   "tg_all": [
+    87.40067106125302,
+    83.05960231689275,
+    81.83293420477689,
+    76.71024033463033,
+    90.42285480307439,
+    86.09738426399731
+   ],
+   "vram_free_before": 11579,
+   "vram_free_loaded": 1273,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 6,
+    "ctx": 20480,
+    "cache_mib": 7175
+   },
+   "tg": 89.42184166939911,
+   "tg_all": [
+    94.89817843244921,
+    87.84093608605099,
+    87.15657431906871,
+    83.085340140409,
+    91.00274725274724,
+    92.69699276963456
+   ],
+   "vram_free_before": 11579,
+   "vram_free_loaded": 1273,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 6,
+    "ctx": 20480,
+    "cache_mib": 7175
+   },
+   "tg": 90.07970460175248,
+   "tg_all": [
+    93.09493223977039,
+    90.08947754902228,
+    86.69962342918278,
+    84.41296094652942,
+    92.9352819738285,
+    90.06993165448269
+   ],
+   "vram_free_before": 11579,
+   "vram_free_loaded": 1273,
+   "load_s": 7.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "embedded",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7175
+   },
+   "tg": 86.56108160456986,
+   "tg_all": [
+    91.60938679326814,
+    86.01429243777487,
+    85.18800295747029,
+    83.66875382495128,
+    90.28068776849987,
+    87.10787077136484
+   ],
+   "vram_free_before": 11579,
+   "vram_free_loaded": 1273,
+   "load_s": 7.6,
+   "ok": true
+  }
+ ]
+}

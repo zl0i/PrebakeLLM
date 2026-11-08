@@ -1,0 +1,17 @@
+hardware: {'gpu': 'NVIDIA GeForce RTX 4070 SUPER', 'vram_mib': 12282, 'driver': '621.01', 'cpu': '13th Gen Intel(R) Core(TM) i7-13700KF', 'ram_gib': 63}
+model: 21794 MiB, MoE, 256 experts; VRAM free 11513 MiB; modes to try: ['moe-zc']; MTP heads: ['embedded']; small drafts: none
+fixed VRAM use (dense weights, KV, buffers): 2826 MiB -> expert cache up to 7987 MiB
+fixed VRAM use (dense weights, KV, buffers, draft): 3130 MiB -> expert cache up to 7687 MiB
+  moe-zc,  7987 MiB cache, 8 CPU threads, draft none -> 83.0 tok/s, VRAM free 702 MiB
+  moe-zc,  7475 MiB cache, 8 CPU threads, draft none -> 83.1 tok/s, VRAM free 1221 MiB
+  moe-zc,  7687 MiB cache, 8 CPU threads, draft mtp 1 -> 81.1 tok/s, VRAM free 773 MiB
+  moe-zc,  7175 MiB cache, 8 CPU threads, draft mtp 1 -> 80.2 tok/s, VRAM free 1338 MiB
+  moe-zc,  7687 MiB cache, 8 CPU threads, draft mtp 2 -> 38.2 tok/s, VRAM free 763 MiB
+  moe-zc,  7175 MiB cache, 8 CPU threads, draft mtp 2 -> 88.3 tok/s, VRAM free 1273 MiB
+  moe-zc,  7687 MiB cache, 8 CPU threads, draft mtp 3 -> 19.3 tok/s, VRAM free 701 MiB
+  moe-zc,  7175 MiB cache, 8 CPU threads, draft mtp 3 -> 83.9 tok/s, VRAM free 1211 MiB
+  moe-zc,  7175 MiB cache, 4 CPU threads, draft mtp 2 -> 84.6 tok/s, VRAM free 1273 MiB
+  moe-zc,  7175 MiB cache, 6 CPU threads, draft mtp 2 -> 89.4 tok/s, VRAM free 1273 MiB
+  moe-zc,  7175 MiB cache, 6 CPU threads, draft mtp 2 -> 90.1 tok/s, VRAM free 1273 MiB
+  moe-zc,  7175 MiB cache, 8 CPU threads, draft mtp 2 -> 86.6 tok/s, VRAM free 1273 MiB
+best: {'mode': 'moe-zc', 'mtp_file': 'embedded', 'draft_type': 'mtp', 'draft_n': 2, 'cpu_threads': 6, 'ctx': 20480, 'cache_mib': 7175} -> 90.1 tok/s; saved D:\Projects\Work\ai\cache\Qwen3.6-35B-A3B-UD-Q4_K_XL__ba1f8207.json (build took 365 s)

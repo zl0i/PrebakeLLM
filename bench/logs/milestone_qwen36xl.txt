@@ -1,0 +1,15 @@
+round 0 llama.cpp cache7500 + embedded MTP 2 short   91.5  long   93.4  pp_long  613.0  acc 0.78  CPU 34.1%  GPU  80.1 W  20261108-110638_ms_Qwen3.6-35B-_llama_cpp_cache7500___embedded_MTP_2_r0.jsonl
+round 0 llama.cpp cache7500 + embedded MTP 3 short   91.8  long   98.9  pp_long  606.9  acc 0.71  CPU 34.5%  GPU  82.9 W  20261108-110744_ms_Qwen3.6-35B-_llama_cpp_cache7500___embedded_MTP_3_r0.jsonl
+round 0 ours (aic build)                   short   90.8  long   97.7  pp_long  774.0  acc 0.80  CPU 27.4%  GPU  76.0 W  20261108-110850_ms_Qwen3.6-35B-_ours__aic_build__r0.jsonl
+round 1 llama.cpp cache7500 + embedded MTP 2 short   91.7  long   94.8  pp_long  606.7  acc 0.78  CPU 34.1%  GPU  79.0 W  20261108-110952_ms_Qwen3.6-35B-_llama_cpp_cache7500___embedded_MTP_2_r1.jsonl
+round 1 llama.cpp cache7500 + embedded MTP 3 short   92.5  long   98.1  pp_long  611.7  acc 0.71  CPU 34.6%  GPU  79.8 W  20261108-111058_ms_Qwen3.6-35B-_llama_cpp_cache7500___embedded_MTP_3_r1.jsonl
+round 1 ours (aic build)                   short   91.1  long   94.8  pp_long  772.5  acc 0.80  CPU 27.5%  GPU  74.5 W  20261108-111204_ms_Qwen3.6-35B-_ours__aic_build__r1.jsonl
+
+model: Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+| Contender | short, tok/s | long 17K, tok/s | prompt 17K, tok/s | draft accepted | CPU busy | GPU power | GPU J/token (short) | short/long per round |
+|---|---|---|---|---|---|---|---|---|
+| llama.cpp cache7500 + embedded MTP 2 | 91.6 | 94.1 | 610 | 78% | 34% | 80 W | 0.87 | 91.5/93.4, 91.7/94.8 |
+| llama.cpp cache7500 + embedded MTP 3 | 92.2 | 98.5 | 609 | 71% | 35% | 81 W | 0.88 | 91.8/98.9, 92.5/98.1 |
+| ours (aic build) | 90.9 | 96.3 | 773 | 80% | 27% | 75 W | 0.83 | 90.8/97.7, 91.1/94.8 |
+
+raw: D:\Projects\Work\ai\bench\milestone_results_Qwen3.6-35B-A3B-UD-Q4_K_XL.json

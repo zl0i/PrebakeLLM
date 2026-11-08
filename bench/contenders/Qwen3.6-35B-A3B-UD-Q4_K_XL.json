@@ -1,0 +1,4 @@
+[
+ {"name": "llama.cpp cache7500 + embedded MTP 2", "server": "", "args": ["-ngl", "99", "-cmoe", "--moe-cache-mib", "7500", "-lm", "none", "-t", "8", "--spec-type", "draft-mtp", "--spec-draft-n-max", "2"]},
+ {"name": "llama.cpp cache7500 + embedded MTP 3", "server": "", "args": ["-ngl", "99", "-cmoe", "--moe-cache-mib", "7500", "-lm", "none", "-t", "8", "--spec-type", "draft-mtp", "--spec-draft-n-max", "3"]}
+]
