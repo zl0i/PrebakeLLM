@@ -1,0 +1,15 @@
+round 0 llama.cpp cache7000+mtp3           short  112.9  long  111.0  pp_long 1188.2  acc 0.67  CPU  5.4%  GPU  95.4 W  20261108-045952_ms_gemma-4-26B-_llama_cpp_cache7000_mtp3_r0.jsonl
+round 0 llama.cpp cache6500+mtp3           short  109.1  long  102.6  pp_long 1151.9  acc 0.67  CPU  5.5%  GPU  93.7 W  20261108-050040_ms_gemma-4-26B-_llama_cpp_cache6500_mtp3_r0.jsonl
+round 0 ours (aic build)                   short  124.4  long  121.0  pp_long 1347.7  acc 0.66  CPU 27.5%  GPU 100.4 W  20261108-050129_ms_gemma-4-26B-_ours__aic_build__r0.jsonl
+round 1 llama.cpp cache7000+mtp3           short  115.0  long  104.5  pp_long 1188.6  acc 0.67  CPU  5.4%  GPU  96.7 W  20261108-050214_ms_gemma-4-26B-_llama_cpp_cache7000_mtp3_r1.jsonl
+round 1 llama.cpp cache6500+mtp3           short  108.2  long  103.5  pp_long 1151.3  acc 0.67  CPU  5.4%  GPU  92.9 W  20261108-050301_ms_gemma-4-26B-_llama_cpp_cache6500_mtp3_r1.jsonl
+round 1 ours (aic build)                   short  124.2  long  120.1  pp_long 1346.1  acc 0.66  CPU 27.6%  GPU  98.2 W  20261108-050350_ms_gemma-4-26B-_ours__aic_build__r1.jsonl
+
+model: gemma-4-26B-A4B-it-UD-Q4_K_M.gguf
+| Contender | short, tok/s | long 17K, tok/s | prompt 17K, tok/s | draft accepted | CPU busy | GPU power | GPU J/token (short) | short/long per round |
+|---|---|---|---|---|---|---|---|---|
+| llama.cpp cache7000+mtp3 | 114.0 | 107.8 | 1188 | 67% | 5% | 96 W | 0.84 | 112.9/111.0, 115.0/104.5 |
+| llama.cpp cache6500+mtp3 | 108.6 | 103.1 | 1152 | 67% | 5% | 93 W | 0.86 | 109.1/102.6, 108.2/103.5 |
+| ours (aic build) | 124.3 | 120.5 | 1347 | 66% | 28% | 99 W | 0.80 | 124.4/121.0, 124.2/120.1 |
+
+raw: D:\Projects\Work\ai\bench\milestone_results_gemma-4-26B-A4B-it-UD-Q4_K_M.json

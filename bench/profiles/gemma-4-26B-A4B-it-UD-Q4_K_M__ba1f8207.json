@@ -1,0 +1,321 @@
+{
+ "model": "D:\\Projects\\Work\\ai\\models\\gemma-4-26B-A4B-it-UD-Q4_K_M.gguf",
+ "model_fingerprint": "f678e6a83d20",
+ "hardware": {
+  "gpu": "NVIDIA GeForce RTX 4070 SUPER",
+  "vram_mib": 12282,
+  "driver": "621.01",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-13700KF",
+  "ram_gib": 63
+ },
+ "power_plan": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+ "model_info": {
+  "n_expert": 128,
+  "size_mib": 16162,
+  "tokenizer": ":262144:8cd1cd5f0013"
+ },
+ "engine": "f3d308026e9b",
+ "built": "2026-11-08 04:59:43",
+ "build_seconds": 272,
+ "fixed_vram_mib": 4029,
+ "config": {
+  "mode": "moe-zc",
+  "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+  "draft_type": "mtp",
+  "draft_n": 3,
+  "cpu_threads": 6,
+  "ctx": 20480,
+  "cache_mib": 6918
+ },
+ "expected_tg": 120.0,
+ "trials": [
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 0,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7428
+   },
+   "tg": 74.85620521892938,
+   "tg_all": [
+    77.52085384101204,
+    75.1582932922405,
+    73.58392593847275,
+    74.55411714561825,
+    75.33185101728795,
+    73.97230830355444
+   ],
+   "vram_free_before": 11645,
+   "vram_free_loaded": 698,
+   "load_s": 6.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 0,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6916
+   },
+   "tg": 73.76113709027369,
+   "tg_all": [
+    77.74156357353031,
+    73.8288721037839,
+    72.66827389997829,
+    73.69340207676349,
+    74.18404548461777,
+    73.14053977718356
+   ],
+   "vram_free_before": 11646,
+   "vram_free_loaded": 1210,
+   "load_s": 6.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 1,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6918
+   },
+   "tg": 98.87765353516045,
+   "tg_all": [
+    105.39132993915804,
+    93.4449814755609,
+    98.63566405065033,
+    101.5733001484631,
+    96.75340599372137,
+    99.11964301967056
+   ],
+   "vram_free_before": 11645,
+   "vram_free_loaded": 701,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 1,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6406
+   },
+   "tg": 95.83834595410157,
+   "tg_all": [
+    104.40928966879929,
+    94.71829349803593,
+    93.92921872157018,
+    98.8631975840073,
+    96.23794377646166,
+    95.43874813174148
+   ],
+   "vram_free_before": 11646,
+   "vram_free_loaded": 1212,
+   "load_s": 6.7,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6918
+   },
+   "tg": 107.28770264972096,
+   "tg_all": [
+    128.37695996899575,
+    105.90426254665782,
+    102.73215852541233,
+    123.68872448920058,
+    107.97317375939502,
+    106.6022315400469
+   ],
+   "vram_free_before": 11645,
+   "vram_free_loaded": 700,
+   "load_s": 7.2,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6406
+   },
+   "tg": 104.21290621433423,
+   "tg_all": [
+    126.6021340820111,
+    104.46272651658198,
+    100.46999738398875,
+    119.70007227174175,
+    101.54624920726867,
+    103.96308591208646
+   ],
+   "vram_free_before": 11641,
+   "vram_free_loaded": 1212,
+   "load_s": 7.0,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6918
+   },
+   "tg": 115.92419066934636,
+   "tg_all": [
+    134.75684018093014,
+    104.71962801480564,
+    112.65458121545083,
+    127.94762355395045,
+    100.19269765372647,
+    119.1938001232419
+   ],
+   "vram_free_before": 11645,
+   "vram_free_loaded": 700,
+   "load_s": 6.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6406
+   },
+   "tg": 113.76963588273642,
+   "tg_all": [
+    131.4808046294474,
+    97.44844425703835,
+    113.64968449703939,
+    123.11933283259641,
+    101.07701051073768,
+    113.88958726843346
+   ],
+   "vram_free_before": 11645,
+   "vram_free_loaded": 1212,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 4,
+    "ctx": 20480,
+    "cache_mib": 6918
+   },
+   "tg": 113.16027643077604,
+   "tg_all": [
+    146.00028098167283,
+    103.9164067667227,
+    108.40721842077274,
+    128.99980528331278,
+    101.04508580888496,
+    117.91333444077932
+   ],
+   "vram_free_before": 11641,
+   "vram_free_loaded": 700,
+   "load_s": 6.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 6,
+    "ctx": 20480,
+    "cache_mib": 6918
+   },
+   "tg": 119.96427519353855,
+   "tg_all": [
+    139.32604748652304,
+    108.22731820873577,
+    116.76735096740649,
+    135.03115907689642,
+    105.17883378502901,
+    123.16119941967062
+   ],
+   "vram_free_before": 11645,
+   "vram_free_loaded": 700,
+   "load_s": 6.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 6,
+    "ctx": 20480,
+    "cache_mib": 6918
+   },
+   "tg": 119.71162755748627,
+   "tg_all": [
+    139.77874519125953,
+    108.19071778077023,
+    114.34291656418952,
+    135.13766193146566,
+    104.90209467710936,
+    125.08033855078301
+   ],
+   "vram_free_before": 11646,
+   "vram_free_loaded": 700,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-gemma-4-26B-A4B-it.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6918
+   },
+   "tg": 116.34872992229411,
+   "tg_all": [
+    134.07436826940346,
+    103.92265540031792,
+    113.56153249502542,
+    129.5407495276651,
+    100.6631103255027,
+    119.1359273495628
+   ],
+   "vram_free_before": 11645,
+   "vram_free_loaded": 700,
+   "load_s": 6.6,
+   "ok": true
+  }
+ ]
+}

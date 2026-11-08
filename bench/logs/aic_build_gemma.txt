@@ -1,0 +1,17 @@
+hardware: {'gpu': 'NVIDIA GeForce RTX 4070 SUPER', 'vram_mib': 12282, 'driver': '621.01', 'cpu': '13th Gen Intel(R) Core(TM) i7-13700KF', 'ram_gib': 63}
+model: 16162 MiB, MoE, 128 experts; VRAM free 11647 MiB; modes to try: ['moe-zc']; MTP head: mtp-gemma-4-26B-A4B-it.gguf; small drafts: none
+fixed VRAM use (dense weights, KV, buffers, draft): 4029 MiB -> expert cache up to 6918 MiB
+fixed VRAM use (dense weights, KV, buffers): 3518 MiB -> expert cache up to 7428 MiB
+  moe-zc,  7428 MiB cache, 8 CPU threads, draft none -> 74.9 tok/s, VRAM free 698 MiB
+  moe-zc,  6916 MiB cache, 8 CPU threads, draft none -> 73.8 tok/s, VRAM free 1210 MiB
+  moe-zc,  6918 MiB cache, 8 CPU threads, draft mtp 1 -> 98.9 tok/s, VRAM free 701 MiB
+  moe-zc,  6406 MiB cache, 8 CPU threads, draft mtp 1 -> 95.8 tok/s, VRAM free 1212 MiB
+  moe-zc,  6918 MiB cache, 8 CPU threads, draft mtp 2 -> 107.3 tok/s, VRAM free 700 MiB
+  moe-zc,  6406 MiB cache, 8 CPU threads, draft mtp 2 -> 104.2 tok/s, VRAM free 1212 MiB
+  moe-zc,  6918 MiB cache, 8 CPU threads, draft mtp 3 -> 115.9 tok/s, VRAM free 700 MiB
+  moe-zc,  6406 MiB cache, 8 CPU threads, draft mtp 3 -> 113.8 tok/s, VRAM free 1212 MiB
+  moe-zc,  6918 MiB cache, 4 CPU threads, draft mtp 3 -> 113.2 tok/s, VRAM free 700 MiB
+  moe-zc,  6918 MiB cache, 6 CPU threads, draft mtp 3 -> 120.0 tok/s, VRAM free 700 MiB
+  moe-zc,  6918 MiB cache, 6 CPU threads, draft mtp 3 -> 119.7 tok/s, VRAM free 700 MiB
+  moe-zc,  6918 MiB cache, 8 CPU threads, draft mtp 3 -> 116.3 tok/s, VRAM free 700 MiB
+best: {'mode': 'moe-zc', 'mtp_file': 'mtp-gemma-4-26B-A4B-it.gguf', 'draft_type': 'mtp', 'draft_n': 3, 'cpu_threads': 6, 'ctx': 20480, 'cache_mib': 6918} -> 120.0 tok/s; saved D:\Projects\Work\ai\cache\gemma-4-26B-A4B-it-UD-Q4_K_M__ba1f8207.json (build took 272 s)

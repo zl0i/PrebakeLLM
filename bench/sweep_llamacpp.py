@@ -141,6 +141,22 @@ STAGES = {
         ("cache7500_mtp3", f"-ngl 99 -cmoe --moe-cache-mib 7500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
         ("cache6500_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
     ],
+    # Gemma 4 26B-A4B (16 GB, almost fits): bigger caches, MTP sidecar (gemma4-assistant) via draft-mtp
+    "gemma": [
+        ("cache8000", "-ngl 99 -cmoe --moe-cache-mib 8000 -lm none -t 8"),
+        ("cache9000", "-ngl 99 -cmoe --moe-cache-mib 9000 -lm none -t 8"),
+        ("cache7500_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 7500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("cache8500_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 8500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("cache8500_mtp3", f"-ngl 99 -cmoe --moe-cache-mib 8500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
+        ("cache8500_mtp4", f"-ngl 99 -cmoe --moe-cache-mib 8500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 4"),
+        ("fit_mtp3", f"-lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
+    ],
+    "gemma2": [
+        ("cache7000_mtp3", f"-ngl 99 -cmoe --moe-cache-mib 7000 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
+        ("cache7000_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 7000 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("cache6500_mtp4", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 4"),
+        ("cache6500_mtp3_t6", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 6 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
+    ],
     # the larger caches the first passes pointed to (GLM unsloth file is 0.5 GB smaller than meshllm's)
     "glm_nodraft2": [
         ("cache9000_t6", "-ngl 99 -cmoe --moe-cache-mib 9000 -lm none -t 6"),

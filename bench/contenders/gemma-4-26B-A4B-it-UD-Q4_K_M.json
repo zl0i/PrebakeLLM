@@ -1,0 +1,4 @@
+[
+ {"name": "llama.cpp cache7000+mtp3", "server": "", "args": ["-ngl", "99", "-cmoe", "--moe-cache-mib", "7000", "-lm", "none", "-t", "8", "-md", "models/mtp-gemma-4-26B-A4B-it.gguf", "--spec-type", "draft-mtp", "--spec-draft-n-max", "3"]},
+ {"name": "llama.cpp cache6500+mtp3", "server": "", "args": ["-ngl", "99", "-cmoe", "--moe-cache-mib", "6500", "-lm", "none", "-t", "8", "-md", "models/mtp-gemma-4-26B-A4B-it.gguf", "--spec-type", "draft-mtp", "--spec-draft-n-max", "3"]}
+]
