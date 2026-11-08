@@ -1,0 +1,71 @@
+[
+ {
+  "name": "ours before 0010 Q4 MTP2 cache3180",
+  "server": "D:\\Projects\\Work\\ai\\build\\llama-fork-base\\bin\\llama-server.exe",
+  "args": [
+   "-ngl",
+   "99",
+   "-cmoe",
+   "-lm",
+   "none",
+   "-t",
+   "1",
+   "-md",
+   "D:\\Projects\\Work\\ai\\models\\qwen38\\mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+   "--spec-type",
+   "draft-mtp",
+   "--spec-draft-n-max",
+   "2"
+  ],
+  "env": {
+   "LLAMA_MOE_ZC_MIB": "3180",
+   "LLAMA_MOE_ZC_THREADS": "8"
+  }
+ },
+ {
+  "name": "ours 0010 v1 binary",
+  "server": "D:\\Projects\\Work\\ai\\build\\llama-fork-v1-bin\\llama-server.exe",
+  "args": [
+   "-ngl",
+   "99",
+   "-cmoe",
+   "-lm",
+   "none",
+   "-t",
+   "1",
+   "-md",
+   "D:\\Projects\\Work\\ai\\models\\qwen38\\mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+   "--spec-type",
+   "draft-mtp",
+   "--spec-draft-n-max",
+   "2"
+  ],
+  "env": {
+   "LLAMA_MOE_ZC_MIB": "3632",
+   "LLAMA_MOE_ZC_THREADS": "8"
+  }
+ },
+ {
+  "name": "ours 0010+0011",
+  "server": "D:\\Projects\\Work\\ai\\build\\llama-fork\\bin\\llama-server.exe",
+  "args": [
+   "-ngl",
+   "99",
+   "-cmoe",
+   "-lm",
+   "none",
+   "-t",
+   "1",
+   "-md",
+   "D:\\Projects\\Work\\ai\\models\\qwen38\\mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+   "--spec-type",
+   "draft-mtp",
+   "--spec-draft-n-max",
+   "2"
+  ],
+  "env": {
+   "LLAMA_MOE_ZC_MIB": "3632",
+   "LLAMA_MOE_ZC_THREADS": "8"
+  }
+ }
+]
