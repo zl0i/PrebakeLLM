@@ -1,0 +1,137 @@
+From edef8a827e1f1f355cc7e20e95211d9ed29fa2fa Mon Sep 17 00:00:00 2001
+From: Claude Agent <noreply@anthropic.com>
+Date: Sun, 8 Nov 2026 12:04:44 +0300
+Subject: [PATCH] moe-zc: adaptive upload budget per decode step (grows while
+ copies finish within the step, shrinks when the step waits for them) and miss
+ priority (experts needed by several tokens of the step first, then
+ round-robin over layers instead of key order, which starved the last layers);
+ a draft verify step misses hundreds of experts and the fixed cap of 64 let
+ the cache fall behind
+
+---
+ ggml/src/ggml-cuda/moe-zc.cu | 55 ++++++++++++++++++++++++++++++------
+ 1 file changed, 46 insertions(+), 9 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/moe-zc.cu b/ggml/src/ggml-cuda/moe-zc.cu
+index 1a1da88c7..68db76f78 100644
+--- a/ggml/src/ggml-cuda/moe-zc.cu
++++ b/ggml/src/ggml-cuda/moe-zc.cu
+@@ -148,7 +148,13 @@ struct ggml_cuda_moe_zc {
+     int n_embd = 0, n_ff = 0, n_used = 0;
+ 
+     int  reserve_slots = 32;
+-    int  max_uploads_per_step = 64;
++    // Uploads per decode step: an adaptive budget between 64 and max_uploads_per_step. It grows while the
++    // previous step's copies were done by the time the next step began, and shrinks when the step had to
++    // wait for them (the copies then sit on the critical path). With a draft, a verify step of 3-4 tokens
++    // misses several hundred experts; a fixed cap of 64 let the cache fall far behind (Qwen3.8: 33% hits).
++    int  max_uploads_per_step = 1024;
++    int  up_budget = 64;
++    int64_t st_up_wait_ns = 0;
+     bool verbose = false;
+     int  n_threads = 8;
+ 
+@@ -770,7 +776,8 @@ ggml_cuda_moe_zc * ggml_cuda_moe_zc_create(int device, int n_layer, int n_expert
+     m->scale_gate.resize(n_layer);
+     m->scale_up.resize(n_layer);
+     if (const char * s = getenv("LLAMA_MOE_ZC_RESERVE"))     m->reserve_slots = atoi(s);
+-    if (const char * s = getenv("LLAMA_MOE_ZC_MAX_UPLOADS")) m->max_uploads_per_step = atoi(s);
++    if (const char * s = getenv("LLAMA_MOE_ZC_MAX_UPLOADS")) m->max_uploads_per_step = std::max(1, atoi(s));
++    m->up_budget = std::min(m->up_budget, m->max_uploads_per_step);
+     if (const char * s = getenv("LLAMA_MOE_ZC_VERBOSE"))     m->verbose = atoi(s) != 0;
+     if (const char * s = getenv("LLAMA_MOE_ZC_THREADS"))     m->n_threads = std::max(1, atoi(s));
+     if (n_slots > 0) {
+@@ -877,6 +884,7 @@ void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_t
+     zc_crf & p = m->policy;
+ 
+     // 1. uploads started during the last step are complete: they become visible now
++    const int64_t t_wait0 = zc_now_ns();
+     {
+         std::unique_lock<std::mutex> lock(m->up_mutex);
+         m->up_cv.wait(lock, [m] { return !m->up_busy; });
+@@ -885,6 +893,13 @@ void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_t
+         CUDA_CHECK(cudaEventSynchronize(m->copy_done));
+         m->copy_pending = false;
+     }
++    if (n_tokens <= ZC_MAX_TOKENS) {
++        // adapt the upload budget: waiting here means last step's copies were longer than the step
++        const int64_t waited = zc_now_ns() - t_wait0;
++        m->st_up_wait_ns += waited;
++        if (waited > 200000) m->up_budget = std::max(std::min(64, m->max_uploads_per_step), m->up_budget * 3 / 4);
++        else                 m->up_budget = std::min(m->max_uploads_per_step, m->up_budget + 32);
++    }
+     for (int key : m->pending) {
+         if (m->slot_of[key] >= 0) zc_set_entry(m, key, true);
+     }
+@@ -892,6 +907,7 @@ void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_t
+ 
+     // 2. CRF bookkeeping for the experts of this step, collect misses
+     std::vector<int> misses;
++    std::vector<int> miss_uses;  // per miss: how many tokens of this step routed to it
+     for (int tok = 0; tok < n_tokens; ++tok) {
+         for (int il = 0; il < m->n_layer; ++il) {
+             for (int k = 0; k < n_used; ++k) {
+@@ -899,20 +915,40 @@ void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_t
+                 if (e < 0 || e >= m->n_expert) continue;
+                 const int key = il * m->n_expert + e;
+                 if (n_tokens <= ZC_MAX_TOKENS) { if (m->published[key]) m->st_hits++; else m->st_misses++; }
+-                if (m->used_step[key] == m->step) continue;
++                if (m->used_step[key] == m->step) {
++                    if (m->slot_of[key] < 0) {
++                        for (size_t i = misses.size(); i-- > 0;) if (misses[i] == key) { miss_uses[i]++; break; }
++                    }
++                    continue;
++                }
+                 m->used_step[key] = m->step;
+                 p.use(key);
+                 if (m->slot_of[key] >= 0) p.push(m->slot_of[key], p.class_of(key));
+-                else misses.push_back(key);
++                else { misses.push_back(key); miss_uses.push_back(1); }
+             }
+         }
+     }
+     p.clock += n_tokens;
+ 
+     if (m->n_slots > 0) {
+-        // 3. make room, then give misses free slots and upload them during the next token
+-        std::sort(misses.begin(), misses.end());
+-        const int max_up = n_tokens > ZC_MAX_TOKENS ? std::max(m->max_uploads_per_step, 16 * n_tokens) : m->max_uploads_per_step;
++        // 3. make room, then give misses free slots and upload them during the next token.
++        // When not all misses fit the budget: first the experts several tokens of the step need, then
++        // round-robin over layers (sorting by key gave every upload to the first layers, the last ones starved)
++        if (n_tokens <= ZC_MAX_TOKENS && (int) misses.size() > m->up_budget) {
++            std::vector<int> rr(misses.size()), cnt(m->n_layer, 0), order(misses.size());
++            for (size_t i = 0; i < misses.size(); ++i) { rr[i] = cnt[misses[i] / m->n_expert]++; order[i] = (int) i; }
++            std::sort(order.begin(), order.end(), [&](int a, int b) {
++                if (miss_uses[a] != miss_uses[b]) return miss_uses[a] > miss_uses[b];
++                if (rr[a] != rr[b]) return rr[a] < rr[b];
++                return misses[a] < misses[b];
++            });
++            std::vector<int> sorted(misses.size());
++            for (size_t i = 0; i < order.size(); ++i) sorted[i] = misses[order[i]];
++            misses.swap(sorted);
++        } else {
++            std::sort(misses.begin(), misses.end());
++        }
++        const int max_up = n_tokens > ZC_MAX_TOKENS ? std::max(m->max_uploads_per_step, 16 * n_tokens) : m->up_budget;
+         const int want = std::min((int) misses.size(), max_up);
+         while ((int) m->free_slots.size() < std::max(want, m->reserve_slots)) {
+             if (!zc_evict_one(m)) break;
+@@ -968,11 +1004,12 @@ void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_t
+     std::atomic_thread_fence(std::memory_order_release);
+ 
+     if (m->verbose && m->st_steps % 64 == 0) {
+-        GGML_LOG_INFO("moe_zc: steps %lld tokens %lld | VRAM hit %.1f%% | CPU experts/token %.1f (%.1f us/expert) | uploads/step %.1f\n",
++        GGML_LOG_INFO("moe_zc: steps %lld tokens %lld | VRAM hit %.1f%% | CPU experts/token %.1f (%.1f us/expert) | uploads/step %.1f (budget %d, wait %.2f ms/step)\n",
+             (long long) m->st_steps, (long long) m->st_tokens,
+             100.0 * m->st_hits / std::max<int64_t>(1, m->st_hits + m->st_misses),
+             (double) m->st_cpu_experts.load() / std::max<int64_t>(1, m->st_tokens),
+-            m->st_cpu_ns.load() / 1000.0 / std::max<int64_t>(1, m->st_cpu_experts.load()), (double) m->st_uploads / m->st_steps);
++            m->st_cpu_ns.load() / 1000.0 / std::max<int64_t>(1, m->st_cpu_experts.load()), (double) m->st_uploads / m->st_steps,
++            m->up_budget, m->st_up_wait_ns / 1e6 / std::max<int64_t>(1, m->st_steps));
+     }
+ }
+ 
+-- 
+2.45.2.windows.1
+

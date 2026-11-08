@@ -103,6 +103,56 @@ def post(url: str, body: dict, timeout: float = 1800) -> dict:
         return json.loads(r.read())
 
 
+def post_stream(url: str, body: dict, timeout: float = 1800) -> dict:
+    """Streaming request (SSE) timed by the client: works with llama-server /completion and OpenAI-style
+    /v1/chat/completions. Returns the merged final event (timings, usage...) plus client timestamps:
+      client.ttft_s     request sent -> first generated text arrives (prompt processing + first token + HTTP)
+      client.decode_s   first -> last chunk with text
+      client.total_s    request sent -> stream closed
+    Token counts are taken from the server's final event (a chunk may carry several tokens, e.g. accepted drafts)."""
+    body = dict(body, stream=True)
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+    t0 = time.perf_counter()
+    t_first = t_last = None
+    content, tokens, first_tokens, n_chunks, final = [], [], 0, 0, {}
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        for raw in r:
+            line = raw.decode("utf-8", "replace").strip()
+            if not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                break
+            ev = json.loads(data)
+            now = time.perf_counter()
+            if "choices" in ev:  # OpenAI chat chunk
+                piece = "".join((c.get("delta") or {}).get("content") or "" for c in ev["choices"])
+                toks = []
+            else:                # llama-server /completion chunk
+                piece, toks = ev.get("content", ""), ev.get("tokens") or []
+            if piece or toks:
+                n_chunks += 1
+                if t_first is None:
+                    t_first, first_tokens = now, max(1, len(toks))
+                t_last = now
+                content.append(piece)
+                tokens += toks
+            for k in ("timings", "usage", "tokens_predicted", "tokens_evaluated", "stop_type"):
+                if ev.get(k) is not None:
+                    final[k] = ev[k]
+    t_end = time.perf_counter()
+    tm = final.get("timings", {})
+    n_gen = tm.get("predicted_n") or (final.get("usage") or {}).get("completion_tokens") or len(tokens)
+    dec = (t_last - t_first) if t_first is not None else 0.0
+    final.update(content="".join(content), tokens=tokens or None, client={
+        "ttft_s": (t_first - t0) if t_first is not None else None, "decode_s": dec, "total_s": t_end - t0,
+        "n_gen": n_gen, "n_chunks": n_chunks,
+        # the first chunk's tokens arrive at t_first, so they are not part of the decode interval
+        "tg": (n_gen - first_tokens) / dec if dec > 0 else None,
+        "pp": (tm.get("prompt_n") or 0) / (t_first - t0) if t_first is not None else None})
+    return final
+
+
 def wait_ready(base: str, proc: subprocess.Popen, timeout: float = 600) -> None:
     t0 = time.time()
     while time.time() - t0 < timeout:
@@ -178,6 +228,8 @@ def main() -> None:
     ap.add_argument("--ctx", type=int, default=20480)
     ap.add_argument("--n-probs", type=int, default=0,
                     help="store top-N token probabilities per generated token (for correctness analysis; slows generation)")
+    ap.add_argument("--stream", action="store_true",
+                    help="streaming requests timed by the client (TTFT, decode rate); ignored with --n-probs")
     ap.add_argument("--plain", action="store_true", help="do not add --no-webui/--metrics (servers that lack them, e.g. ik_llama.cpp)")
     ap.add_argument("--prompts", default="", help="prompt file (default: bench/prompts/<model>.json, else bench/prompts.json)")
     ap.add_argument("server_args", nargs=argparse.REMAINDER)
@@ -228,12 +280,17 @@ def main() -> None:
                             body["n_probs"] = a.n_probs
                         t0 = time.time()
                         sampler.start()
-                        r = post(base + "/completion", body)
+                        if a.stream and not a.n_probs:
+                            r = post_stream(base + "/completion", body)
+                        else:
+                            r = post(base + "/completion", body)
                         wall = time.time() - t0
                         load = sampler.stop()  # includes prompt processing; dominated by generation for short prompts
                         tm = r.get("timings", {})
                         rec = {"kind": "run", "id": p["id"], "rep": rep, "wall_s": wall, "timings": tm, "load": load,
                                "tokens": r.get("tokens"), "content": r.get("content")}
+                        if "client" in r:
+                            rec["client"] = r["client"]
                         if a.n_probs:
                             # per generated token: [(token_id, logprob), ...] top-N candidates
                             rec["top"] = [[(t["id"], t["logprob"]) for t in step.get("top_logprobs", [])]
@@ -244,8 +301,9 @@ def main() -> None:
                         acc = ""
                         if tm.get("draft_n"):
                             acc = f"  draft {tm['draft_n_accepted']}/{tm['draft_n']}"
+                        cl = f"  client tg {r['client']['tg']:6.2f} ttft {r['client']['ttft_s']:.2f}s" if r.get("client") else ""
                         print(f"  {p['id']:8s} rep{rep}: pp {tm.get('prompt_per_second', 0):8.1f} t/s"
-                              f" ({tm.get('prompt_n')} tok)  tg {tm.get('predicted_per_second', 0):6.2f} t/s{acc}"
+                              f" ({tm.get('prompt_n')} tok)  tg {tm.get('predicted_per_second', 0):6.2f} t/s{acc}{cl}"
                               f"  | CPU busy {100 * (load['cpu_busy'] or 0):4.1f}%  GPU {load['gpu_w']} W")
             print(f"[{a.tag}] median tg t/s: " + ", ".join(
                 f"{k}={statistics.median(x['predicted_per_second'] for x in v):.2f}" for k, v in results.items()))

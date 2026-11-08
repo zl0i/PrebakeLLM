@@ -1,0 +1,19 @@
+warning: the engine changed since this build; consider rebuilding
+round 0 llama.cpp cache6500+mtp2           short   96.0  long   99.6  pp_long  614.5  acc 0.79  CPU  7.1%  GPU  75.2 W  20261108-134435_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_r0.jsonl
+round 0 ours before 0010 (same config)     short  122.4  long  139.5  pp_long  819.7  acc 0.80  CPU 27.8%  GPU  82.9 W  20261108-134547_ms_Qwen3.6-35B-_ours_before_0010__same_config__r0.jsonl
+round 0 ours (aic build)                   short  122.8  long  136.0  pp_long  815.4  acc 0.77  CPU 27.0%  GPU  85.3 W  20261108-134639_ms_Qwen3.6-35B-_ours__aic_build__r0.jsonl
+round 1 llama.cpp cache6500+mtp2           short   97.5  long  101.5  pp_long  614.9  acc 0.79  CPU  6.5%  GPU  76.7 W  20261108-134733_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_r1.jsonl
+round 1 ours before 0010 (same config)     short  122.3  long  140.3  pp_long  818.0  acc 0.80  CPU 27.4%  GPU  81.1 W  20261108-134837_ms_Qwen3.6-35B-_ours_before_0010__same_config__r1.jsonl
+round 1 ours (aic build)                   short  122.6  long  136.0  pp_long  816.3  acc 0.77  CPU 27.1%  GPU  83.6 W  20261108-134930_ms_Qwen3.6-35B-_ours__aic_build__r1.jsonl
+round 2 llama.cpp cache6500+mtp2           short   99.8  long   99.7  pp_long  614.3  acc 0.79  CPU  6.5%  GPU  76.6 W  20261108-135023_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_r2.jsonl
+round 2 ours before 0010 (same config)     short  122.0  long  135.5  pp_long  816.5  acc 0.80  CPU 27.4%  GPU  80.3 W  20261108-135126_ms_Qwen3.6-35B-_ours_before_0010__same_config__r2.jsonl
+round 2 ours (aic build)                   short  122.3  long  133.0  pp_long  814.3  acc 0.77  CPU 27.1%  GPU  84.7 W  20261108-135220_ms_Qwen3.6-35B-_ours__aic_build__r2.jsonl
+
+model: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+| Contender | short, tok/s | long 17K, tok/s | prompt 17K, tok/s | draft accepted | CPU busy | GPU power | GPU J/token (short) | short/long per round |
+|---|---|---|---|---|---|---|---|---|
+| llama.cpp cache6500+mtp2 | 97.5 | 99.7 | 614 | 79% | 6% | 77 W | 0.79 | 96.0/99.6, 97.5/101.5, 99.8/99.7 |
+| ours before 0010 (same config) | 122.3 | 139.5 | 818 | 80% | 27% | 81 W | 0.66 | 122.4/139.5, 122.3/140.3, 122.0/135.5 |
+| ours (aic build) | 122.6 | 136.0 | 815 | 77% | 27% | 85 W | 0.69 | 122.8/136.0, 122.6/136.0, 122.3/133.0 |
+
+raw: bench\milestone_results_q36_p0010.json

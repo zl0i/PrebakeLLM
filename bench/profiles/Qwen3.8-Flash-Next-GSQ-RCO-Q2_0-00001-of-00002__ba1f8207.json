@@ -14,10 +14,10 @@
   "size_mib": 63346,
   "tokenizer": "qwen35:248320:3efeb133134b"
  },
- "engine": "d403f38045a0",
- "built": "2026-11-08 09:34:55",
- "build_seconds": 968,
- "fixed_vram_mib": 4327,
+ "engine": "b73216e79bae",
+ "built": "2026-11-08 12:53:21",
+ "build_seconds": 1475,
+ "fixed_vram_mib": 4344,
  "config": {
   "mode": "moe-zc",
   "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
@@ -25,199 +25,347 @@
   "draft_n": 2,
   "cpu_threads": 8,
   "ctx": 20480,
-  "cache_mib": 3180
+  "cache_mib": 3632
  },
- "expected_tg": 48.1,
+ "expected_tg": 59.7,
  "trials": [
   {
    "cfg": {
     "mode": "moe-zc",
-    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
     "draft_type": "mtp",
     "draft_n": 0,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 6457
+    "cache_mib": 6393
    },
-   "tg": 47.42423237663388,
+   "tg": 48.67577790712537,
    "tg_all": [
-    48.45077873199741,
-    46.38404295570791,
-    46.20776639213248,
-    47.99992754727917,
-    49.29391886654989,
-    46.8485372059886
+    49.406546584935604,
+    47.28600628636227,
+    46.24686343010368,
+    48.22412389050394,
+    49.16340276298324,
+    49.127431923746805
    ],
-   "vram_free_before": 11505,
-   "vram_free_loaded": 701,
+   "vram_free_before": 11433,
+   "vram_free_loaded": 700,
    "load_s": 20.8,
    "ok": true
   },
   {
    "cfg": {
     "mode": "moe-zc",
-    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
     "draft_type": "mtp",
     "draft_n": 0,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 5945
+    "cache_mib": 5881
    },
-   "tg": 44.54634091073945,
+   "tg": 48.04205106490127,
    "tg_all": [
-    48.17542398917961,
-    45.04105109383185,
-    40.50205223134467,
-    42.33403792437543,
-    44.05163072764706,
-    46.9648868057615
+    49.0087895260511,
+    46.60579383296894,
+    46.211043218660194,
+    48.15384517539357,
+    48.57797896054124,
+    47.93025695440898
    ],
-   "vram_free_before": 11505,
-   "vram_free_loaded": 1214,
+   "vram_free_before": 11440,
+   "vram_free_loaded": 1219,
    "load_s": 21.3,
    "ok": true
   },
   {
    "cfg": {
     "mode": "moe-zc",
-    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
     "draft_type": "mtp",
     "draft_n": 1,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 3692
+    "cache_mib": 4706
    },
-   "tg": 47.515475637792484,
+   "tg": 53.9658800407296,
    "tg_all": [
-    49.476282657069305,
-    45.36295068020175,
-    45.42437940727184,
-    48.38980636773332,
-    47.418962037691216,
-    47.61198923789375
+    54.952100086091626,
+    51.93944840305796,
+    52.32287226900932,
+    53.72351245000165,
+    55.40200952496436,
+    54.20824763145756
    ],
-   "vram_free_before": 11498,
-   "vram_free_loaded": 824,
-   "load_s": 22.9,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 831,
+   "load_s": 21.8,
    "ok": true
   },
   {
    "cfg": {
     "mode": "moe-zc",
-    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
     "draft_type": "mtp",
     "draft_n": 1,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 3180
+    "cache_mib": 4194
    },
-   "tg": 46.87048566392856,
+   "tg": 53.04483151212656,
    "tg_all": [
-    50.27234012684439,
-    45.958525754550834,
-    45.288603763739324,
-    47.53580657052475,
-    47.05886531308796,
-    46.682106014769154
+    54.837646078522,
+    53.22213143590299,
+    51.433390362935356,
+    53.66076072059314,
+    52.11880990794966,
+    52.867531588350126
    ],
-   "vram_free_before": 11505,
-   "vram_free_loaded": 1344,
-   "load_s": 25.0,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 1343,
+   "load_s": 21.9,
    "ok": true
   },
   {
    "cfg": {
     "mode": "moe-zc",
-    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
     "draft_type": "mtp",
     "draft_n": 2,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 3692
+    "cache_mib": 4706
    },
-   "tg": 46.88732739920185,
+   "tg": 56.742358354359496,
    "tg_all": [
-    55.30009693167934,
-    45.110913266183324,
-    46.4520290772173,
-    53.00390462097374,
-    47.3226257211864,
-    46.41146006950627
+    63.7614439761476,
+    49.675965861676495,
+    54.0929112090378,
+    60.47924667963229,
+    53.35106780987827,
+    59.39180549968118
    ],
-   "vram_free_before": 11505,
-   "vram_free_loaded": 721,
-   "load_s": 22.9,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 719,
+   "load_s": 21.6,
    "ok": true
   },
   {
    "cfg": {
     "mode": "moe-zc",
-    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
     "draft_type": "mtp",
     "draft_n": 2,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 3180
+    "cache_mib": 4194
    },
-   "tg": 48.098509482616876,
+   "tg": 54.7952941457017,
    "tg_all": [
-    54.07232632750962,
-    46.301203598331526,
-    45.81665155773734,
-    51.64086409780975,
-    48.900041242110255,
-    47.29697772312349
+    63.14307147755979,
+    53.99089489398939,
+    51.41790533155171,
+    60.73268831907961,
+    50.547550780419215,
+    55.599693397414015
    ],
-   "vram_free_before": 11507,
-   "vram_free_loaded": 1212,
-   "load_s": 22.3,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 1231,
+   "load_s": 21.8,
    "ok": true
   },
   {
    "cfg": {
     "mode": "moe-zc",
-    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
     "draft_type": "mtp",
     "draft_n": 3,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 3692
+    "cache_mib": 4706
    },
-   "tg": 46.660574281073096,
+   "tg": 55.87710076799699,
    "tg_all": [
-    55.16232642081153,
-    46.188195691541864,
-    44.771038375537785,
-    54.06269232207764,
-    45.5333501720817,
-    47.13295287060433
+    66.59342785691041,
+    51.846214345945334,
+    55.6828166680033,
+    60.22891533405457,
+    49.61535617116736,
+    56.07138486799069
    ],
-   "vram_free_before": 11505,
-   "vram_free_loaded": 606,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 605,
+   "load_s": 22.2,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 4194
+   },
+   "tg": 52.745663917687814,
+   "tg_all": [
+    63.26371539444926,
+    48.77209352831128,
+    51.64145113127257,
+    59.67520922916519,
+    49.83513659215426,
+    53.84987670410306
+   ],
+   "vram_free_before": 11445,
+   "vram_free_loaded": 1117,
+   "load_s": 22.2,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 5237,
+    "draft_cpu_moe": true
+   },
+   "tg": 37.29074368940884,
+   "tg_all": [
+    41.24495430240645,
+    34.748075360926514,
+    36.69082030290003,
+    43.56220477359571,
+    34.33423754023476,
+    37.89066707591765
+   ],
+   "vram_free_before": 11445,
+   "vram_free_loaded": 699,
    "load_s": 22.8,
    "ok": true
   },
   {
    "cfg": {
     "mode": "moe-zc",
-    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 4725,
+    "draft_cpu_moe": true
+   },
+   "tg": 36.129380515387766,
+   "tg_all": [
+    39.98609791513994,
+    35.37561898989926,
+    35.80259395422537,
+    39.484800338526284,
+    34.66414584928465,
+    36.45616707655016
+   ],
+   "vram_free_before": 11445,
+   "vram_free_loaded": 1211,
+   "load_s": 22.2,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
     "draft_type": "mtp",
     "draft_n": 3,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 3180
+    "cache_mib": 5237,
+    "draft_cpu_moe": true
    },
-   "tg": 44.901070491263326,
+   "tg": 35.01033251770142,
    "tg_all": [
-    53.52535132323758,
-    40.928568836061004,
-    45.04071935977591,
-    53.6549480660597,
-    43.92213020674063,
-    44.76142162275074
+    41.56972510908131,
+    30.635849956011548,
+    33.39194775231239,
+    40.49822495515904,
+    33.47668654072976,
+    36.543978494673084
    ],
-   "vram_free_before": 11505,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 585,
+   "load_s": 21.9,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q2exps.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 4725,
+    "draft_cpu_moe": true
+   },
+   "tg": 33.39355485850538,
+   "tg_all": [
+    40.85808138158904,
+    32.91034910429,
+    33.2535805113104,
+    39.18574486679065,
+    33.14557787960025,
+    33.53352920570036
+   ],
+   "vram_free_before": 11444,
    "vram_free_loaded": 1097,
+   "load_s": 22.2,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "draft_type": "mtp",
+    "draft_n": 1,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 3632
+   },
+   "tg": 53.28264248315122,
+   "tg_all": [
+    53.3463422359096,
+    54.20471792410248,
+    51.02212723763315,
+    53.413383983106584,
+    53.21894273039284,
+    52.17233802950001
+   ],
+   "vram_free_before": 11444,
+   "vram_free_loaded": 831,
+   "load_s": 22.3,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "draft_type": "mtp",
+    "draft_n": 1,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 3120
+   },
+   "tg": 52.35569250666467,
+   "tg_all": [
+    52.6142324476935,
+    53.72803275314943,
+    50.186209776463045,
+    52.11264328109068,
+    51.44840194468488,
+    52.59874173223866
+   ],
+   "vram_free_before": 11444,
+   "vram_free_loaded": 1343,
    "load_s": 22.3,
    "ok": true
   },
@@ -229,21 +377,20 @@
     "draft_n": 2,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 4670,
-    "draft_cpu_moe": true
+    "cache_mib": 3632
    },
-   "tg": 32.894347076006454,
+   "tg": 59.48257997154334,
    "tg_all": [
-    34.97118726081027,
-    32.94447798749436,
-    31.4404408305734,
-    35.064459061251654,
-    32.84421616451854,
-    31.93892153310037
+    64.12947862733876,
+    59.40127992946565,
+    53.22979301645203,
+    62.97605840375892,
+    59.563880013621024,
+    55.13990624135188
    ],
-   "vram_free_before": 11504,
-   "vram_free_loaded": 701,
-   "load_s": 23.0,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 719,
+   "load_s": 22.3,
    "ok": true
   },
   {
@@ -254,20 +401,142 @@
     "draft_n": 2,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 4158,
+    "cache_mib": 3120
+   },
+   "tg": 56.25038582731331,
+   "tg_all": [
+    59.473424543373135,
+    53.64006906411911,
+    51.935715995906556,
+    57.9504141267802,
+    60.271517500346846,
+    54.550357527846415
+   ],
+   "vram_free_before": 11445,
+   "vram_free_loaded": 1231,
+   "load_s": 21.9,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 3632
+   },
+   "tg": 58.583243826424116,
+   "tg_all": [
+    64.95734875968232,
+    57.15357921593916,
+    56.221034233659566,
+    66.93412251049267,
+    60.01290843690907,
+    56.39715800887528
+   ],
+   "vram_free_before": 11445,
+   "vram_free_loaded": 605,
+   "load_s": 21.8,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 3120
+   },
+   "tg": 55.97035519891096,
+   "tg_all": [
+    64.41077709779623,
+    54.50798147688519,
+    54.77909726114849,
+    62.73978732395867,
+    57.161613136673424,
+    52.108237001370874
+   ],
+   "vram_free_before": 11445,
+   "vram_free_loaded": 1117,
+   "load_s": 22.4,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 4611,
     "draft_cpu_moe": true
    },
-   "tg": 32.019303433647025,
+   "tg": 42.4323564317434,
    "tg_all": [
-    35.32167717986398,
-    33.05669660064891,
-    30.98191026664513,
-    35.359019696753045,
-    30.044868893829182,
-    30.51384157750804
+    45.46181050659611,
+    41.22225275722426,
+    36.17827287655723,
+    43.64246010626253,
+    46.06707423955284,
+    39.88805254987512
    ],
-   "vram_free_before": 11505,
-   "vram_free_loaded": 1215,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 699,
+   "load_s": 22.9,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 4099,
+    "draft_cpu_moe": true
+   },
+   "tg": 40.57016867475479,
+   "tg_all": [
+    42.9635906537167,
+    39.15888681382363,
+    36.77317473224966,
+    43.342390711752934,
+    41.98145053568595,
+    38.55053854374977
+   ],
+   "vram_free_before": 11445,
+   "vram_free_loaded": 1211,
+   "load_s": 22.7,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 4611,
+    "draft_cpu_moe": true
+   },
+   "tg": 40.45189929763443,
+   "tg_all": [
+    46.455544235465915,
+    40.328093133038834,
+    40.19720394316874,
+    45.63773569091944,
+    39.77518763757149,
+    40.57570546223001
+   ],
+   "vram_free_before": 11444,
+   "vram_free_loaded": 585,
    "load_s": 22.9,
    "ok": true
   },
@@ -279,45 +548,20 @@
     "draft_n": 3,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 4670,
+    "cache_mib": 4099,
     "draft_cpu_moe": true
    },
-   "tg": 29.921724374843073,
+   "tg": 39.76481109226886,
    "tg_all": [
-    34.80740123564085,
-    29.16395203465338,
-    27.721521106015466,
-    35.2112676056338,
-    29.183259674663553,
-    30.660189075022593
+    46.07673950558789,
+    39.05767344493347,
+    37.02323848553998,
+    45.39080627774834,
+    40.471948739604244,
+    37.29573547894058
    ],
-   "vram_free_before": 11507,
-   "vram_free_loaded": 584,
-   "load_s": 22.9,
-   "ok": true
-  },
-  {
-   "cfg": {
-    "mode": "moe-zc",
-    "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
-    "draft_type": "mtp",
-    "draft_n": 3,
-    "cpu_threads": 8,
-    "ctx": 20480,
-    "cache_mib": 4158,
-    "draft_cpu_moe": true
-   },
-   "tg": 28.899269308481408,
-   "tg_all": [
-    33.99251737039017,
-    26.914624272691523,
-    28.1335960079312,
-    33.97279825819968,
-    29.115941142582777,
-    28.68259747438004
-   ],
-   "vram_free_before": 11505,
-   "vram_free_loaded": 1100,
+   "vram_free_before": 11444,
+   "vram_free_loaded": 1097,
    "load_s": 22.8,
    "ok": true
   },
@@ -329,19 +573,19 @@
     "draft_n": 2,
     "cpu_threads": 4,
     "ctx": 20480,
-    "cache_mib": 3180
+    "cache_mib": 3632
    },
-   "tg": 36.04943273899525,
+   "tg": 51.691870052937965,
    "tg_all": [
-    41.58383680724009,
-    34.6684766954793,
-    34.848933162376305,
-    40.09780838997464,
-    36.622966331286285,
-    35.47589914670422
+    54.7618719605439,
+    51.089967504852744,
+    45.14879082167676,
+    52.293772601023186,
+    53.37857867280711,
+    46.809836071365275
    ],
-   "vram_free_before": 11505,
-   "vram_free_loaded": 1215,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 719,
    "load_s": 22.3,
    "ok": true
   },
@@ -353,20 +597,20 @@
     "draft_n": 2,
     "cpu_threads": 6,
     "ctx": 20480,
-    "cache_mib": 3180
+    "cache_mib": 3632
    },
-   "tg": 44.452790570130375,
+   "tg": 58.544857175560544,
    "tg_all": [
-    48.741787468639714,
-    43.352293827124136,
-    43.154326112628446,
-    49.41683473052441,
-    45.13805004191593,
-    43.76753109834482
+    62.7483047105034,
+    57.85533546270077,
+    51.959697574952685,
+    60.71230424577563,
+    59.234378888420316,
+    55.478211717417025
    ],
-   "vram_free_before": 11505,
-   "vram_free_loaded": 1232,
-   "load_s": 22.4,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 719,
+   "load_s": 22.5,
    "ok": true
   },
   {
@@ -377,20 +621,20 @@
     "draft_n": 2,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 3180
+    "cache_mib": 3632
    },
-   "tg": 48.12880687805652,
+   "tg": 60.4392955104708,
    "tg_all": [
-    54.346544328835556,
-    47.05997957182522,
-    45.81704763013482,
-    51.69749875145664,
-    48.87707231870065,
-    47.38054143741239
+    63.96928187038133,
+    59.82060590372946,
+    55.898328323577495,
+    61.84551690016266,
+    61.057985117212134,
+    56.61604812150444
    ],
-   "vram_free_before": 11505,
-   "vram_free_loaded": 1230,
-   "load_s": 22.4,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 719,
+   "load_s": 22.3,
    "ok": true
   },
   {
@@ -398,23 +642,23 @@
     "mode": "moe-zc",
     "mtp_file": "mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
     "draft_type": "mtp",
-    "draft_n": 1,
+    "draft_n": 3,
     "cpu_threads": 8,
     "ctx": 20480,
-    "cache_mib": 3692
+    "cache_mib": 3632
    },
-   "tg": 47.14515488823598,
+   "tg": 56.47787676581821,
    "tg_all": [
-    50.57290513668043,
-    45.52861731307281,
-    46.12342745219989,
-    48.255795779044306,
-    47.30874250684564,
-    46.981567269626325
+    66.93575682871014,
+    55.06230351588392,
+    54.37810429720405,
+    66.08031126735803,
+    55.37632742106871,
+    57.57942611056771
    ],
-   "vram_free_before": 11504,
-   "vram_free_loaded": 832,
-   "load_s": 22.3,
+   "vram_free_before": 11445,
+   "vram_free_loaded": 605,
+   "load_s": 24.4,
    "ok": true
   }
  ]

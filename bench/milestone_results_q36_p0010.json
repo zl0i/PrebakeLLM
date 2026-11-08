@@ -1,0 +1,116 @@
+{
+ "llama.cpp cache6500+mtp2": [
+  {
+   "short": 95.98019452409409,
+   "long": 99.55986730038738,
+   "pp_long": 614.4596875290736,
+   "short_srv": 95.97595784799594,
+   "long_srv": 99.55990617162098,
+   "client_timed": true,
+   "acc": 0.7859026443487261,
+   "cpu_busy": 0.071375,
+   "gpu_w": 75.1625,
+   "log": "20261108-134435_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_r0.jsonl"
+  },
+  {
+   "short": 97.51538151889972,
+   "long": 101.49460962130856,
+   "pp_long": 614.8955605971668,
+   "short_srv": 97.5151375360379,
+   "long_srv": 101.4939915556999,
+   "client_timed": true,
+   "acc": 0.7859026443487261,
+   "cpu_busy": 0.0645,
+   "gpu_w": 76.6625,
+   "log": "20261108-134733_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_r1.jsonl"
+  },
+  {
+   "short": 99.83585302239108,
+   "long": 99.73735438885757,
+   "pp_long": 614.2681225978714,
+   "short_srv": 99.83470398223884,
+   "long_srv": 99.73833354845523,
+   "client_timed": true,
+   "acc": 0.7859026443487261,
+   "cpu_busy": 0.064625,
+   "gpu_w": 76.5875,
+   "log": "20261108-135023_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_r2.jsonl"
+  }
+ ],
+ "ours before 0010 (same config)": [
+  {
+   "short": 122.4145758808299,
+   "long": 139.48036616907453,
+   "pp_long": 819.6521408175959,
+   "short_srv": 122.41232299233214,
+   "long_srv": 139.4889344248844,
+   "client_timed": true,
+   "acc": 0.7953152250190785,
+   "cpu_busy": 0.27775,
+   "gpu_w": 82.9375,
+   "log": "20261108-134547_ms_Qwen3.6-35B-_ours_before_0010__same_config__r0.jsonl"
+  },
+  {
+   "short": 122.33471106735072,
+   "long": 140.3452305544322,
+   "pp_long": 817.9665295752727,
+   "short_srv": 122.3365950728854,
+   "long_srv": 140.34794181119292,
+   "client_timed": true,
+   "acc": 0.7953152250190785,
+   "cpu_busy": 0.2735,
+   "gpu_w": 81.0625,
+   "log": "20261108-134837_ms_Qwen3.6-35B-_ours_before_0010__same_config__r1.jsonl"
+  },
+  {
+   "short": 121.95048468328001,
+   "long": 135.47128627691822,
+   "pp_long": 816.4925063739856,
+   "short_srv": 121.95210150272092,
+   "long_srv": 135.47256016575466,
+   "client_timed": true,
+   "acc": 0.7953152250190785,
+   "cpu_busy": 0.27437500000000004,
+   "gpu_w": 80.275,
+   "log": "20261108-135126_ms_Qwen3.6-35B-_ours_before_0010__same_config__r2.jsonl"
+  }
+ ],
+ "ours (aic build)": [
+  {
+   "short": 122.78259946587991,
+   "long": 136.01711276628203,
+   "pp_long": 815.4157921795828,
+   "short_srv": 122.78382069277096,
+   "long_srv": 136.01501605777278,
+   "client_timed": true,
+   "acc": 0.7706385689892962,
+   "cpu_busy": 0.269625,
+   "gpu_w": 85.2875,
+   "log": "20261108-134639_ms_Qwen3.6-35B-_ours__aic_build__r0.jsonl"
+  },
+  {
+   "short": 122.58733722007287,
+   "long": 135.95240578181503,
+   "pp_long": 816.3341134483613,
+   "short_srv": 122.59130937794941,
+   "long_srv": 135.95084017619226,
+   "client_timed": true,
+   "acc": 0.7706385689892962,
+   "cpu_busy": 0.27125,
+   "gpu_w": 83.5625,
+   "log": "20261108-134930_ms_Qwen3.6-35B-_ours__aic_build__r1.jsonl"
+  },
+  {
+   "short": 122.25883326865626,
+   "long": 133.0457111151445,
+   "pp_long": 814.2763160223718,
+   "short_srv": 122.26336674528204,
+   "long_srv": 133.04387160796824,
+   "client_timed": true,
+   "acc": 0.7706385689892962,
+   "cpu_busy": 0.2705,
+   "gpu_w": 84.6875,
+   "log": "20261108-135220_ms_Qwen3.6-35B-_ours__aic_build__r2.jsonl"
+  }
+ ]
+}

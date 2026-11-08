@@ -57,6 +57,10 @@ def strata_summary(log):
         lo = [r["timings"] for r in rs if r["rep"] == rep and r["id"] == "long16k"][0]
         dn = sum(t.get("draft_n", 0) for t in sh_)
         da = sum(t.get("draft_n_accepted", 0) for t in sh_)
+        cs = [r["client"] for r in rs if r["rep"] == rep and r["id"] != "long16k" and r.get("client")]
+        cl = [r["client"] for r in rs if r["rep"] == rep and r["id"] == "long16k" and r.get("client")]
+        if cs and cl:
+            print(f"  Strata round {rep} (client clock): short {statistics.mean(c['tg'] for c in cs):.1f}  long {cl[0]['tg']:.1f}  prompt 17K {cl[0]['pp']:.0f}")
         print(f"  Strata round {rep}: short {statistics.mean(t['predicted_per_second'] for t in sh_):.1f}  long {lo['predicted_per_second']:.1f}"
               f"  prompt 17K {lo['prompt_per_second']:.0f}  drafts accepted (short) {da}/{dn}")
 
@@ -66,18 +70,29 @@ def main():
     ap.add_argument("which", choices=list(MODELS))
     ap.add_argument("--rounds", type=int, default=2)
     ap.add_argument("--tail-skip", default="", help="STRATA_ROUTE_TAIL_SKIP for Strata (0 = compute every expert)")
+    ap.add_argument("--drafting", default="", help="Strata --drafting (mtp, off, ...; default: the model's setting)")
+    ap.add_argument("--stream", action="store_true", help="client-timed streaming requests for all engines")
+    ap.add_argument("--set", action="append", default=[], help="extra Strata --set KEY=VALUE (repeatable)")
     ap.add_argument("--skip-strata", action="store_true")
     ap.add_argument("--skip-llama-ours", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="print the commands only")
     a = ap.parse_args()
     m = MODELS[a.which]
-    tag = f"strata_{a.which}" + (f"_tail{a.tail_skip}" if a.tail_skip != "" else "")
+    tag = f"strata_{a.which}" + (f"_tail{a.tail_skip}" if a.tail_skip != "" else "") + (f"_draft{a.drafting}" if a.drafting else "")
     strata_log = None
 
     if not a.skip_strata:
         extra = ["--set", f"STRATA_ROUTE_TAIL_SKIP={a.tail_skip}"] if a.tail_skip != "" else []
+        for kv in a.set:
+            extra += ["--set", kv]
+        flags = list(m["strata"])
+        if a.drafting:
+            if "--drafting" in flags:
+                flags[flags.index("--drafting") + 1] = a.drafting
+            else:
+                flags += ["--drafting", a.drafting]
         sh(["cmd", "/c", STRATA, "launch", "--stop"], a.dry_run, capture_output=True)
-        r = sh(["cmd", "/c", STRATA, "launch"] + m["strata"] + extra +
+        r = sh(["cmd", "/c", STRATA, "launch"] + flags + extra +
                ["--data-dir", DATA, "--context", "32k", "--vision", "off", "--tune", "skip", "--port", PORT,
                 "--no-api-key", "--no-tui", "--yes", "--restart"], a.dry_run, capture_output=True)
         if r.returncode:
@@ -91,14 +106,15 @@ def main():
                     pass
                 time.sleep(1)
         r = sh([sys.executable, ROOT / "bench" / "strata_bench.py", "--model", m["model"], "--url", f"http://127.0.0.1:{PORT}",
-                "--tag", tag, "--rounds", a.rounds], a.dry_run, capture_output=True)
+                "--tag", tag, "--rounds", a.rounds] + (["--stream"] if a.stream else []), a.dry_run, capture_output=True)
         print(r.stdout[-3000:])
         strata_log = next((l.split("log: ", 1)[1].strip() for l in r.stdout.splitlines() if l.startswith("log: ")), None)
         sh(["cmd", "/c", STRATA, "launch", "--stop"], a.dry_run, capture_output=True)
         time.sleep(0 if a.dry_run else 5)
 
     if not a.skip_llama_ours:
-        r = sh([sys.executable, ROOT / "bench" / "milestone.py", "--model", m["model"], "--rounds", a.rounds], a.dry_run,
+        r = sh([sys.executable, ROOT / "bench" / "milestone.py", "--model", m["model"], "--rounds", a.rounds]
+               + (["--stream"] if a.stream else []), a.dry_run,
                capture_output=True)
         print(r.stdout[-2500:])
 

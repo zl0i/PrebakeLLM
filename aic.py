@@ -220,12 +220,14 @@ def measure(model: pathlib.Path, cfg: dict, prompts: list, n_predict: int = 160,
         sb.wait_ready(base, proc)
         load_s = time.time() - t0
         free1 = sb.vram_free_mib()
-        sb.post(base + "/completion", {"prompt": prompts[0], "n_predict": 96, "temperature": 0, "ignore_eos": True})
+        # timeouts: a hung engine (seen twice, after an abnormally slow load; DECISIONS D11) fails the probe
+        # instead of stalling the build for half an hour
+        sb.post(base + "/completion", {"prompt": prompts[0], "n_predict": 96, "temperature": 0, "ignore_eos": True}, timeout=300)
         tg = []
         for _ in range(passes):
             for p in prompts:
                 r = sb.post(base + "/completion", {"prompt": p, "n_predict": n_predict, "temperature": 0, "top_k": 1,
-                                                   "ignore_eos": True, "cache_prompt": False})
+                                                   "ignore_eos": True, "cache_prompt": False}, timeout=300)
                 tg.append(r["timings"]["predicted_per_second"])
         return {"tg": statistics.median(tg), "tg_all": tg, "vram_free_before": free0, "vram_free_loaded": free1,
                 "load_s": round(load_s, 1), "ok": True}

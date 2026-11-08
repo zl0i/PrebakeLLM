@@ -101,6 +101,8 @@ python tools/cachesim.py <eval.bin> [--calib <calib.bin>] [--mib 5500 6500 7500]
   - эксперты должны лежать в RAM (`-cmoe`), а собственный пул llama — `-t 1`.
 
   Код — `ggml/src/ggml-cuda/moe-zc.cu` (менеджер, почта GPU↔CPU, CPU-потоки), хуки в `mmvq.cu` и `mmq.cu`, `src/llama-moe-zc.cpp`.
+- **Патч 0010** (D11): адаптивный лимит подвоза экспертов за шаг, `LLAMA_MOE_ZC_MAX_UPLOADS` (по умолчанию 1024). Статистика движка — `LLAMA_MOE_ZC_VERBOSE=1`; у llama-server она видна только с `-lv 4`.
+- **Время по часам клиента:** `--stream` у `serverbench.py`, `milestone.py`, `strata_bench.py`, `strata_compare.py`. Время шага — `bench/step_times.py`. Профиль любого движка с CUDA-графами (в т.ч. Strata) — `tools/graphsplit.py <sqlite>`.
 - **Компилятор:** `python aic.py build|run|show --model <gguf>`, профили — в `cache/`, копии — в `bench/profiles/`.
   - Режимы: `moe-zc`, `gpu`, `fit`.
   - Драфты: встроенный MTP, файлы `mtp-<base>*.gguf` рядом с моделью (все пробуются), маленькая модель того же токенизатора.

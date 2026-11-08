@@ -1,0 +1,30 @@
+round 0 llama.cpp best (MTP 3, head experts in RAM, cache 5500) short   49.1  long   50.6  pp_long  205.6  acc 0.72  CPU 33.2%  GPU  72.6 W  20261108-125347_ms_Qwen3.8-Flas_llama_cpp_best__MTP_3__head_experts_in_RAM__cache_5500__r0.jsonl
+round 0 llama.cpp no draft (cache 6500)    short   40.0  long   39.9  pp_long  328.2  acc 0.00  CPU  6.0%  GPU  78.6 W  20261108-125633_ms_Qwen3.8-Flas_llama_cpp_no_draft__cache_6500__r0.jsonl
+round 0 ours before 0010 (Q4 head, MTP 2, cache 3180) short   46.5  long   49.6  pp_long  403.2  acc 0.78  CPU 35.7%  GPU  65.1 W  20261108-125853_ms_Qwen3.8-Flas_ours_before_0010__Q4_head__MTP_2__cache_3180__r0.jsonl
+round 0 ours before 0010, no draft (cache 6457) short   46.6  long   47.4  pp_long  469.0  acc 0.00  CPU 35.8%  GPU  83.5 W  20261108-130059_ms_Qwen3.8-Flas_ours_before_0010__no_draft__cache_6457__r0.jsonl
+round 0 ours 0010, no draft (cache 6457)   short   47.1  long   48.4  pp_long  456.1  acc 0.00  CPU 35.9%  GPU  83.8 W  20261108-130256_ms_Qwen3.8-Flas_ours_0010__no_draft__cache_6457__r0.jsonl
+round 0 ours (aic build)                   short   56.2  long   57.1  pp_long  396.6  acc 0.79  CPU 34.8%  GPU  74.4 W  20261108-130453_ms_Qwen3.8-Flas_ours__aic_build__r0.jsonl
+round 1 llama.cpp best (MTP 3, head experts in RAM, cache 5500) short   48.9  long   50.1  pp_long  235.3  acc 0.72  CPU 33.1%  GPU  71.1 W  20261108-130650_ms_Qwen3.8-Flas_llama_cpp_best__MTP_3__head_experts_in_RAM__cache_5500__r1.jsonl
+round 1 llama.cpp no draft (cache 6500)    short   39.0  long   38.8  pp_long  328.5  acc 0.00  CPU  5.9%  GPU  80.2 W  20261108-130925_ms_Qwen3.8-Flas_llama_cpp_no_draft__cache_6500__r1.jsonl
+round 1 ours before 0010 (Q4 head, MTP 2, cache 3180) short   46.7  long   49.6  pp_long  404.2  acc 0.78  CPU 35.4%  GPU  62.2 W  20261108-131147_ms_Qwen3.8-Flas_ours_before_0010__Q4_head__MTP_2__cache_3180__r1.jsonl
+round 1 ours before 0010, no draft (cache 6457) short   46.6  long   48.7  pp_long  468.3  acc 0.00  CPU 35.9%  GPU  84.6 W  20261108-131353_ms_Qwen3.8-Flas_ours_before_0010__no_draft__cache_6457__r1.jsonl
+round 1 ours 0010, no draft (cache 6457)   short   47.1  long   48.3  pp_long  455.3  acc 0.00  CPU 35.9%  GPU  84.0 W  20261108-131549_ms_Qwen3.8-Flas_ours_0010__no_draft__cache_6457__r1.jsonl
+round 1 ours (aic build)                   short   56.7  long   56.5  pp_long  397.0  acc 0.80  CPU 34.8%  GPU  71.6 W  20261108-131747_ms_Qwen3.8-Flas_ours__aic_build__r1.jsonl
+round 2 llama.cpp best (MTP 3, head experts in RAM, cache 5500) short   48.9  long   49.4  pp_long  242.1  acc 0.71  CPU 33.4%  GPU  72.8 W  20261108-131944_ms_Qwen3.8-Flas_llama_cpp_best__MTP_3__head_experts_in_RAM__cache_5500__r2.jsonl
+round 2 llama.cpp no draft (cache 6500)    short   40.4  long   40.1  pp_long  329.8  acc 0.00  CPU  6.1%  GPU  79.4 W  20261108-132217_ms_Qwen3.8-Flas_llama_cpp_no_draft__cache_6500__r2.jsonl
+round 2 ours before 0010 (Q4 head, MTP 2, cache 3180) short   46.7  long   47.7  pp_long  404.6  acc 0.78  CPU 35.4%  GPU  62.3 W  20261108-132436_ms_Qwen3.8-Flas_ours_before_0010__Q4_head__MTP_2__cache_3180__r2.jsonl
+round 2 ours before 0010, no draft (cache 6457) short   46.7  long   48.2  pp_long  468.3  acc 0.00  CPU 35.9%  GPU  83.3 W  20261108-132642_ms_Qwen3.8-Flas_ours_before_0010__no_draft__cache_6457__r2.jsonl
+round 2 ours 0010, no draft (cache 6457)   short   47.0  long   47.0  pp_long  457.3  acc 0.00  CPU 35.6%  GPU  83.0 W  20261108-132839_ms_Qwen3.8-Flas_ours_0010__no_draft__cache_6457__r2.jsonl
+round 2 ours (aic build)                   short   56.8  long   56.0  pp_long  397.2  acc 0.79  CPU 35.0%  GPU  75.0 W  20261108-133036_ms_Qwen3.8-Flas_ours__aic_build__r2.jsonl
+
+model: Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002.gguf
+| Contender | short, tok/s | long 17K, tok/s | prompt 17K, tok/s | draft accepted | CPU busy | GPU power | GPU J/token (short) | short/long per round |
+|---|---|---|---|---|---|---|---|---|
+| llama.cpp best (MTP 3, head experts in RAM, cache 5500) | 48.9 | 50.1 | 235 | 72% | 33% | 73 W | 1.48 | 49.1/50.6, 48.9/50.1, 48.9/49.4 |
+| llama.cpp no draft (cache 6500) | 40.0 | 39.9 | 328 | nan% | 6% | 79 W | 1.98 | 40.0/39.9, 39.0/38.8, 40.4/40.1 |
+| ours before 0010 (Q4 head, MTP 2, cache 3180) | 46.7 | 49.6 | 404 | 78% | 35% | 62 W | 1.33 | 46.5/49.6, 46.7/49.6, 46.7/47.7 |
+| ours before 0010, no draft (cache 6457) | 46.6 | 48.2 | 468 | nan% | 36% | 83 W | 1.79 | 46.6/47.4, 46.6/48.7, 46.7/48.2 |
+| ours 0010, no draft (cache 6457) | 47.1 | 48.3 | 456 | nan% | 36% | 84 W | 1.78 | 47.1/48.4, 47.1/48.3, 47.0/47.0 |
+| ours (aic build) | 56.7 | 56.5 | 397 | 79% | 35% | 74 W | 1.31 | 56.2/57.1, 56.7/56.5, 56.8/56.0 |
+
+raw: bench\milestone_results_q38_honest.json

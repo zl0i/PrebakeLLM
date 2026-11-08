@@ -25,9 +25,13 @@ sys.path.insert(0, str(ROOT / "bench"))
 import serverbench as sb  # noqa: E402
 
 
-def chat(url, msg, n):
+def chat(url, msg, n, stream=False):
     body = {"model": "strata", "messages": [{"role": "user", "content": msg}], "max_tokens": n, "temperature": 0,
             "reasoning_effort": "none", "ignore_eos": True}
+    if stream:  # client-side timing (TTFT, decode rate), see serverbench.post_stream
+        r = sb.post_stream(url + "/v1/chat/completions", dict(body, stream_options={"include_usage": True}))
+        return {"timings": r.get("timings", {}), "usage": r.get("usage"), "client": r["client"],
+                "choices": [{"message": {"content": r["content"]}}]}
     r = urllib.request.Request(url + "/v1/chat/completions", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(r, timeout=3600) as f:
         return json.load(f)
@@ -40,6 +44,7 @@ def main():
     ap.add_argument("--tag", default="strata")
     ap.add_argument("--rounds", type=int, default=2)
     ap.add_argument("--n-predict", type=int, default=256)
+    ap.add_argument("--stream", action="store_true", help="streaming requests timed by the client")
     a = ap.parse_args()
     prompts = json.loads(sb.prompts_path(a.model).read_text(encoding="utf-8"))
     user = lambda p: p.split("<|im_start|>user\n", 1)[1].split("<|im_end|>", 1)[0]
@@ -54,14 +59,17 @@ def main():
                 if p["id"] == "warmup":
                     continue
                 t0 = time.time()
-                d = chat(a.url, user(p["prompt"]), a.n_predict)
+                d = chat(a.url, user(p["prompt"]), a.n_predict, a.stream)
                 t = d["timings"]
                 rec = {"kind": "run", "id": p["id"], "rep": rnd, "timings": t, "wall_s": round(time.time() - t0, 2),
                        "content": d["choices"][0]["message"].get("content", ""), "usage": d.get("usage")}
+                if d.get("client"):
+                    rec["client"] = d["client"]
                 log.write(json.dumps(rec, ensure_ascii=False) + "\n")
                 log.flush()
                 acc = f"  draft {t.get('draft_n_accepted')}/{t.get('draft_n')}" if t.get("draft_n") else ""
-                print(f"  {p['id']:8s} rep{rnd}: pp {t['prompt_per_second']:8.1f} t/s ({t['prompt_n']} tok)  tg {t['predicted_per_second']:7.2f} t/s{acc}",
+                cl = f"  client tg {d['client']['tg']:6.2f} ttft {d['client']['ttft_s']:.2f}s" if d.get("client") else ""
+                print(f"  {p['id']:8s} rep{rnd}: pp {t.get('prompt_per_second', 0):8.1f} t/s ({t.get('prompt_n')} tok)  tg {t.get('predicted_per_second', 0):7.2f} t/s{acc}{cl}",
                       flush=True)
     print(f"log: {out}")
 

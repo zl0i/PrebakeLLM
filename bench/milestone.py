@@ -45,8 +45,10 @@ def ours(model, cfg=None, name="ours (aic build)"):
     return {"name": name, "server": str(aic.ENGINE), "args": args, "env": env}
 
 
-def run(tag, model, c):
+def run(tag, model, c, stream=False):
     cmd = [sys.executable, str(ROOT / "bench" / "serverbench.py"), "--tag", tag, "--reps", "1", "--model", str(model)]
+    if stream:
+        cmd += ["--stream"]
     if c.get("server"):
         cmd += ["--server", c["server"]]
     if c.get("plain"):
@@ -61,21 +63,27 @@ def run(tag, model, c):
     if not log:
         return {"error": (p.stdout + p.stderr)[-800:]}
     short, long_, pp_long, acc, cpu, gpu_w = [], None, None, [], [], []
+    short_srv, long_srv = [], None
     for line in open(log, encoding="utf-8"):
         r = json.loads(line)
         if r["kind"] != "run":
             continue
         t = r["timings"]
+        cl = r.get("client")  # streaming run: speeds by the client's clock (server timings kept as *_srv)
+        tg = cl["tg"] if cl else t["predicted_per_second"]
         if r["id"] == "long16k":
-            long_, pp_long = t["predicted_per_second"], t["prompt_per_second"]
+            long_, long_srv = tg, t["predicted_per_second"]
+            pp_long = cl["pp"] if cl else t["prompt_per_second"]
         else:
-            short.append(t["predicted_per_second"])
+            short.append(tg)
+            short_srv.append(t["predicted_per_second"])
             if r.get("load"):
                 cpu.append(r["load"]["cpu_busy"] or 0)
                 gpu_w.append(r["load"]["gpu_w"] or 0)
         if t.get("draft_n"):
             acc.append(t["draft_n_accepted"] / t["draft_n"])
     return {"short": statistics.mean(short), "long": long_, "pp_long": pp_long,
+            "short_srv": statistics.mean(short_srv), "long_srv": long_srv, "client_timed": stream,
             "acc": statistics.mean(acc) if acc else None,
             "cpu_busy": statistics.mean(cpu) if cpu else None, "gpu_w": statistics.mean(gpu_w) if gpu_w else None,
             "log": pathlib.Path(log).name}
@@ -87,6 +95,9 @@ def main():
     ap.add_argument("--rounds", type=int, default=3)
     ap.add_argument("--only", default="", help="comma-separated contender names")
     ap.add_argument("--contenders", default="", help="contenders file (default: bench/contenders/<model>.json)")
+    ap.add_argument("--stream", action="store_true", help="client-timed streaming requests (speeds by the client's clock)")
+    ap.add_argument("--no-ours", action="store_true", help="only the contenders from the file, not the saved aic build")
+    ap.add_argument("--out", default="", help="results file (default: bench/milestone_results_<model>.json)")
     a = ap.parse_args()
     model = pathlib.Path(a.model).resolve()
     cfile = pathlib.Path(a.contenders) if a.contenders else ROOT / "bench" / "contenders" / f"{model.stem}.json"
@@ -94,7 +105,8 @@ def main():
     for c in json.loads(cfile.read_text(encoding="utf-8")):
         # {"name": ..., "ours_cfg": {...}}: our engine with a fixed config (e.g. transplanted from another model)
         contenders.append(ours(model, dict(c["ours_cfg"]), c["name"]) if "ours_cfg" in c else c)
-    contenders.append(ours(model))
+    if not a.no_ours:
+        contenders.append(ours(model))
     if a.only:
         keep = set(a.only.split(","))
         contenders = [c for c in contenders if c["name"] in keep]
@@ -102,7 +114,7 @@ def main():
     for rnd in range(a.rounds):
         for c in contenders:
             tag = "ms_" + model.stem[:12] + "_" + "".join(ch if ch.isalnum() else "_" for ch in c["name"]) + f"_r{rnd}"
-            r = run(tag, model, c)
+            r = run(tag, model, c, a.stream)
             if "error" in r:
                 print(f"round {rnd} {c['name']}: FAILED {r['error']}", flush=True)
                 continue
@@ -119,7 +131,7 @@ def main():
         print(f"| {name} | {med('short'):.1f} | {med('long'):.1f} | {med('pp_long'):.0f} | {100 * med('acc'):.0f}% | "
               f"{100 * med('cpu_busy'):.0f}% | {med('gpu_w'):.0f} W | {med('gpu_w') / med('short'):.2f} | "
               + ", ".join(f"{r['short']:.1f}/{r['long']:.1f}" for r in rs) + " |")
-    out = ROOT / "bench" / f"milestone_results_{model.stem}.json"
+    out = pathlib.Path(a.out) if a.out else ROOT / "bench" / f"milestone_results_{model.stem}.json"
     out.write_text(json.dumps(results, indent=1), encoding="utf-8")
     print(f"\nraw: {out}")
 

@@ -1,0 +1,89 @@
+[
+ {
+  "name": "llama.cpp best (MTP 3, head experts in RAM, cache 5500)",
+  "server": "",
+  "args": [
+   "-ngl",
+   "99",
+   "-cmoe",
+   "--moe-cache-mib",
+   "5500",
+   "-lm",
+   "none",
+   "-t",
+   "8",
+   "-md",
+   "models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+   "-cmoed",
+   "--spec-type",
+   "draft-mtp",
+   "--spec-draft-n-max",
+   "3"
+  ]
+ },
+ {
+  "name": "llama.cpp no draft (cache 6500)",
+  "server": "",
+  "args": [
+   "-ngl",
+   "99",
+   "-cmoe",
+   "--moe-cache-mib",
+   "6500",
+   "-lm",
+   "none",
+   "-t",
+   "8"
+  ]
+ },
+ {
+  "name": "ours before 0010 (Q4 head, MTP 2, cache 3180)",
+  "server": "D:\\Projects\\Work\\ai\\build\\llama-fork-base\\bin\\llama-server.exe",
+  "args": [
+   "-ngl",
+   "99",
+   "-cmoe",
+   "-lm",
+   "none",
+   "-t",
+   "1",
+   "-md",
+   "D:\\Projects\\Work\\ai\\models\\qwen38\\mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf",
+   "--spec-type",
+   "draft-mtp",
+   "--spec-draft-n-max",
+   "2"
+  ],
+  "env": {
+   "LLAMA_MOE_ZC_MIB": "3180",
+   "LLAMA_MOE_ZC_THREADS": "8"
+  }
+ },
+ {
+  "name": "ours before 0010, no draft (cache 6457)",
+  "server": "D:\\Projects\\Work\\ai\\build\\llama-fork-base\\bin\\llama-server.exe",
+  "args": [
+   "-ngl",
+   "99",
+   "-cmoe",
+   "-lm",
+   "none",
+   "-t",
+   "1"
+  ],
+  "env": {
+   "LLAMA_MOE_ZC_MIB": "6457",
+   "LLAMA_MOE_ZC_THREADS": "8"
+  }
+ },
+ {
+  "name": "ours 0010, no draft (cache 6457)",
+  "ours_cfg": {
+   "mode": "moe-zc",
+   "draft_n": 0,
+   "cpu_threads": 8,
+   "ctx": 20480,
+   "cache_mib": 6457
+  }
+ }
+]

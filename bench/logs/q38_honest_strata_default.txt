@@ -1,0 +1,30 @@
+$ cmd /c D:\Projects\Work\ai\third_party\strata\ctl2\bin\strata.cmd launch --stop
+$ cmd /c D:\Projects\Work\ai\third_party\strata\ctl2\bin\strata.cmd launch --family qwen --model q2_0 --model-path D:\Projects\Work\ai\models\qwen38 --drafting mtp --data-dir D:\Projects\Work\ai\third_party\strata\data --context 32k --vision off --tune skip --port 8091 --no-api-key --no-tui --yes --restart
+$ C:\Users\Dmitri\AppData\Local\Programs\Python\Python312\python.exe D:\Projects\Work\ai\bench\strata_bench.py --model D:\Projects\Work\ai\models\qwen38\Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002.gguf --url http://127.0.0.1:8091 --tag strata_qwen38 --rounds 2 --stream
+  short0   rep0: pp     85.3 t/s (30 tok)  tg   85.90 t/s  draft 142/246  client tg  86.04 ttft 0.37s
+  short1   rep0: pp    120.6 t/s (35 tok)  tg  121.90 t/s  draft 177/214  client tg 122.37 ttft 0.31s
+  short2   rep0: pp    105.4 t/s (39 tok)  tg   71.40 t/s  draft 68/179  client tg  71.40 ttft 0.39s
+  short3   rep0: pp     94.9 t/s (26 tok)  tg   89.50 t/s  draft 153/249  client tg  89.69 ttft 0.30s
+  short4   rep0: pp    133.5 t/s (64 tok)  tg  114.10 t/s  draft 171/217  client tg 114.55 ttft 0.50s
+  short5   rep0: pp    108.5 t/s (34 tok)  tg  109.60 t/s  draft 173/202  client tg 109.86 ttft 0.33s
+  short6   rep0: pp    116.5 t/s (40 tok)  tg   74.30 t/s  draft 65/144  client tg  74.40 ttft 0.36s
+  short7   rep0: pp    103.1 t/s (30 tok)  tg  100.50 t/s  draft 153/213  client tg 100.76 ttft 0.31s
+  long16k  rep0: pp   2382.7 t/s (17160 tok)  tg  108.00 t/s  draft 164/228  client tg 108.36 ttft 7.25s
+  short0   rep1: pp     67.5 t/s (30 tok)  tg   87.10 t/s  draft 142/248  client tg  87.22 ttft 0.46s
+  short1   rep1: pp    122.2 t/s (35 tok)  tg  120.70 t/s  draft 184/211  client tg 121.19 ttft 0.30s
+  short2   rep1: pp    114.6 t/s (39 tok)  tg   70.60 t/s  draft 72/195  client tg  70.67 ttft 0.36s
+  short3   rep1: pp     94.5 t/s (26 tok)  tg   95.30 t/s  draft 155/238  client tg  95.54 ttft 0.31s
+  short4   rep1: pp    127.7 t/s (64 tok)  tg  111.20 t/s  draft 171/218  client tg 111.51 ttft 0.53s
+  short5   rep1: pp    113.6 t/s (34 tok)  tg  112.70 t/s  draft 174/204  client tg 113.02 ttft 0.32s
+  short6   rep1: pp    114.4 t/s (40 tok)  tg   72.10 t/s  draft 64/160  client tg  72.17 ttft 0.37s
+  short7   rep1: pp    103.6 t/s (30 tok)  tg  100.60 t/s  draft 153/218  client tg 100.89 ttft 0.31s
+  long16k  rep1: pp   2601.3 t/s (17160 tok)  tg  110.90 t/s  draft 168/221  client tg 111.21 ttft 6.63s
+log: D:\Projects\Work\ai\bench\logs\20261108-133301_strata_qwen38.jsonl
+
+$ cmd /c D:\Projects\Work\ai\third_party\strata\ctl2\bin\strata.cmd launch --stop
+
+Strata (D:\Projects\Work\ai\bench\logs\20261108-133301_strata_qwen38.jsonl):
+  Strata round 0 (client clock): short 96.1  long 108.4  prompt 17K 2367
+  Strata round 0: short 95.9  long 108.0  prompt 17K 2383  drafts accepted (short) 1102/1664
+  Strata round 1 (client clock): short 96.5  long 111.2  prompt 17K 2589
+  Strata round 1: short 96.3  long 110.9  prompt 17K 2601  drafts accepted (short) 1115/1692
