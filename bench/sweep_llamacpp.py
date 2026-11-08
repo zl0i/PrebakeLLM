@@ -157,6 +157,23 @@ STAGES = {
         ("cache6500_mtp4", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 4"),
         ("cache6500_mtp3_t6", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 6 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
     ],
+    # Qwen3.8-Flash-Next (ISTA-DASLab Q2_0, 512 experts, PLE table read lazily from disk): cache sizes, the two
+    # MTP heads of unsloth (full: the MTP layer with its 512 experts; shared: only its shared expert), draft lengths
+    "qwen38": [
+        ("cache5000", "-ngl 99 -cmoe --moe-cache-mib 5000 -lm none -t 8"),
+        ("cache6500", "-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 8"),
+        ("cache6000_t6", "-ngl 99 -cmoe --moe-cache-mib 6000 -lm none -t 6"),
+        ("shared_cache4500_mtp2", "-ngl 99 -cmoe --moe-cache-mib 4500 -lm none -t 8 -md models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-shared-Q4_K_M.gguf --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("shared_cache4500_mtp3", "-ngl 99 -cmoe --moe-cache-mib 4500 -lm none -t 8 -md models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-shared-Q4_K_M.gguf --spec-type draft-mtp --spec-draft-n-max 3"),
+        ("full_cache3500_mtp2", "-ngl 99 -cmoe --moe-cache-mib 3500 -lm none -t 8 -md models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("full_cache3500_mtp3", "-ngl 99 -cmoe --moe-cache-mib 3500 -lm none -t 8 -md models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf --spec-type draft-mtp --spec-draft-n-max 3"),
+        ("full_cmoed_cache5000_mtp2", "-ngl 99 -cmoe --moe-cache-mib 5000 -lm none -t 8 -md models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf -cmoed --spec-type draft-mtp --spec-draft-n-max 2"),
+    ],
+    "qwen38b": [
+        ("full_cache4000_mtp3", "-ngl 99 -cmoe --moe-cache-mib 4000 -lm none -t 8 -md models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf --spec-type draft-mtp --spec-draft-n-max 3"),
+        ("full_cmoed_cache5000_mtp3", "-ngl 99 -cmoe --moe-cache-mib 5000 -lm none -t 8 -md models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf -cmoed --spec-type draft-mtp --spec-draft-n-max 3"),
+        ("full_cmoed_cache5500_mtp3", "-ngl 99 -cmoe --moe-cache-mib 5500 -lm none -t 8 -md models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf -cmoed --spec-type draft-mtp --spec-draft-n-max 3"),
+    ],
     # the larger caches the first passes pointed to (GLM unsloth file is 0.5 GB smaller than meshllm's)
     "glm_nodraft2": [
         ("cache9000_t6", "-ngl 99 -cmoe --moe-cache-mib 9000 -lm none -t 6"),

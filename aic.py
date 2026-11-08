@@ -98,6 +98,16 @@ def find_draft(model: pathlib.Path):
     return side[0].name if side else None
 
 
+def find_mtp_heads(model: pathlib.Path) -> list:
+    """All MTP heads of the model: "embedded", or every sidecar mtp-<base>*.gguf (some models ship several,
+    e.g. the full MTP layer and one with only its shared expert, which costs less VRAM)."""
+    first = find_draft(model)
+    if first in (None, "embedded"):
+        return [first] if first else []
+    base = model.stem.split("-UD-")[0].split("-Q")[0]
+    return [p.name for p in sorted(model.parent.glob(f"mtp-{base}*.gguf"))]
+
+
 def model_info(model: pathlib.Path) -> dict:
     """What the build needs to know about a GGUF: MoE or dense, total size (all shards), tokenizer."""
     sys.path.insert(0, str(ROOT / "third_party" / "llama.cpp" / "gguf-py"))
@@ -171,6 +181,8 @@ def server_args(model: pathlib.Path, cfg: dict) -> list:
     if dt == "mtp":
         if cfg["mtp_file"] != "embedded":
             args += ["-md", str(model.parent / cfg["mtp_file"])]
+        if cfg.get("draft_cpu_moe"):   # the MTP head's own experts stay in RAM (plain llama.cpp CPU path)
+            args += ["-cmoed"]
         args += ["--spec-type", "draft-mtp", "--spec-draft-n-max", str(cfg["draft_n"])]
     elif dt == "simple":
         args += ["-md", str(model.parent / cfg["draft_model"]), "-ngld", "99",
@@ -234,14 +246,15 @@ def cmd_build(a):
         print(f"warning: no prompts made with this model's chat template, using {pp.name} (bench/make_model_prompts.py)")
     prompts = [p["prompt"] for p in json.loads(pp.read_text(encoding="utf-8"))[:3]]
     info = model_info(model)
-    mtp = find_draft(model)
+    heads = find_mtp_heads(model)
+    mtp = heads[0] if heads else None
     smalls = find_small_drafts(model, info)
     vram_free = sb.vram_free_mib()
     moe = info["n_expert"] > 0
     fits = info["size_mib"] + 1500 + MARGIN_MIB < vram_free   # weights + KV/buffers + desktop margin
     modes = (["moe-zc"] if moe else []) + (["gpu"] if fits else []) + (["fit"] if not moe and not fits else [])
     print(f"model: {info['size_mib']} MiB, {'MoE, ' + str(info['n_expert']) + ' experts' if moe else 'dense'}; "
-          f"VRAM free {vram_free} MiB; modes to try: {modes}; MTP head: {mtp or 'none'}; small drafts: {smalls or 'none'}")
+          f"VRAM free {vram_free} MiB; modes to try: {modes}; MTP heads: {heads or 'none'}; small drafts: {smalls or 'none'}")
     t_start = time.time()
     trials = []
     fixed = None
@@ -251,7 +264,7 @@ def cmd_build(a):
         trials.append({"cfg": cfg, **r})
         what = cfg["mode"] + (f", {cfg['cache_mib']:5d} MiB cache, {cfg['cpu_threads']} CPU threads" if cfg["mode"] == "moe-zc" else "")
         dt = draft_type(cfg)
-        what += f", draft {dt + ' ' + str(cfg['draft_n']) if dt else 'none'}" + (f" ({cfg['draft_model']})" if dt == "simple" else "")
+        what += f", draft {dt + ' ' + str(cfg['draft_n']) if dt else 'none'}" + (f" ({cfg['draft_model']})" if dt == "simple" else "")             + (" (head experts in RAM)" if dt == "mtp" and cfg.get("draft_cpu_moe") else "")
         print(f"  {what} -> " + (f"{r['tg']:.1f} tok/s, VRAM free {r['vram_free_loaded']} MiB" if r["ok"] else f"FAILED {r['error']}"), flush=True)
 
     def key(cfg):
@@ -267,8 +280,8 @@ def cmd_build(a):
 
     # draft options of the plain modes ("gpu", "fit"): none, the MTP head, small models of the family
     plain_drafts = [dict(draft_n=0)]
-    if mtp:
-        plain_drafts += [dict(draft_type="mtp", mtp_file=mtp, draft_n=n) for n in (1, 2, 3)]
+    for h in heads:
+        plain_drafts += [dict(draft_type="mtp", mtp_file=h, draft_n=n) for n in (1, 2, 3)]
     for d in smalls:
         plain_drafts += [dict(draft_type="simple", draft_model=d, draft_n=n) for n in (4, 8)]
 
@@ -278,8 +291,9 @@ def cmd_build(a):
 
         # 1. how much VRAM does everything except the expert cache take? (with and without the draft head:
         #    without speculation the MTP layer is not loaded, which leaves more room for the expert cache)
-        def probe_max_cache(draft_n):
-            pr = measure(model, dict(base, cache_mib=PROBE_CACHE_MIB, draft_n=draft_n), prompts[:1], n_predict=32, passes=1)
+        def probe_max_cache(draft_n, head=mtp, cpu_moe=False):
+            pr = measure(model, dict(base, cache_mib=PROBE_CACHE_MIB, draft_n=draft_n, mtp_file=head, draft_cpu_moe=cpu_moe),
+                         prompts[:1], n_predict=32, passes=1)
             if not pr["ok"]:
                 raise SystemExit(f"engine failed to start: {pr['error']}")
             fx = pr["vram_free_before"] - pr["vram_free_loaded"] - PROBE_CACHE_MIB
@@ -287,14 +301,23 @@ def cmd_build(a):
             print(f"fixed VRAM use (dense weights, KV, buffers{', draft' if draft_n else ''}): {fx} MiB -> expert cache up to {mc} MiB")
             return fx, mc
 
-        fixed, max_cache = probe_max_cache(2 if mtp else 0)
-        max_cache_nodraft = probe_max_cache(0)[1] if mtp else max_cache
+        fixed, max_cache_nodraft = probe_max_cache(0)
+        max_cache = {h: probe_max_cache(2, h)[1] for h in heads}   # each head costs its own VRAM
 
         # 2. small search over the decisions that matter most (each trial = real engine run)
-        for dn in ([0, 1, 2, 3] if mtp else [0]):   # speculation can also hurt (a draft that guesses badly)
-            top = max_cache_nodraft if dn == 0 else max_cache
-            for cache in (top, top - 512):
-                trial(dict(base, cache_mib=int(cache), draft_n=dn))
+        for cache in (max_cache_nodraft, max_cache_nodraft - 512):
+            trial(dict(base, cache_mib=int(cache), draft_n=0))
+        for h in heads:
+            for dn in (1, 2, 3):   # speculation can also hurt (a draft that guesses badly)
+                for cache in (max_cache[h], max_cache[h] - 512):
+                    trial(dict(base, cache_mib=int(cache), mtp_file=h, draft_type="mtp", draft_n=dn))
+            # a head with its own routed experts (e.g. Qwen3.8's MTP layer, 512 experts, ~2 GB) can keep them in RAM:
+            # slower drafting, but the VRAM goes to the main model's expert cache
+            if h != "embedded" and model_info(model.parent / h)["n_expert"] > 0:
+                mc = probe_max_cache(2, h, cpu_moe=True)[1]
+                for dn in (2, 3):
+                    for cache in (mc, mc - 512):
+                        trial(dict(base, cache_mib=int(cache), mtp_file=h, draft_type="mtp", draft_n=dn, draft_cpu_moe=True))
         # a small model of the family as the draft instead of the MTP head (it costs VRAM: smaller cache)
         for d in smalls:
             d_mib = (model.parent / d).stat().st_size // 1048576

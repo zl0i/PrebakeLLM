@@ -1,0 +1,54 @@
+From 8c7a9f2d50de5c67f5df677139e2e12b449fb118 Mon Sep 17 00:00:00 2001
+From: Claude Agent <noreply@anthropic.com>
+Date: Sun, 8 Nov 2026 08:30:06 +0300
+Subject: [PATCH] moe-zc: attach to the first model loaded only (a draft model
+ with experts in RAM, e.g. an MTP head with -cmoed, stays on plain llama.cpp
+ instead of getting a second expert cache)
+
+---
+ src/llama-moe-zc.cpp | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/src/llama-moe-zc.cpp b/src/llama-moe-zc.cpp
+index 811fc59f1..ac3c8ef02 100644
+--- a/src/llama-moe-zc.cpp
++++ b/src/llama-moe-zc.cpp
+@@ -42,11 +42,19 @@ static void * zc_proc(const char * name) {
+     return reg ? ggml_backend_reg_get_proc_address(reg, name) : nullptr;
+ }
+ 
++// one manager per process: the first model loaded (the main model; a draft model with experts in RAM, e.g. an MTP
++// head loaded with -cmoed, is computed by plain llama.cpp and must not get a second cache of LLAMA_MOE_ZC_MIB)
++static bool g_zc_attached = false;
++
+ void llama_moe_zc_attach(llama_model & model) {
+     const char * env = getenv("LLAMA_MOE_ZC_MIB");
+     if (!env) {
+         return;
+     }
++    if (g_zc_attached) {
++        LLAMA_LOG_INFO("%s: moe-zc already serves the first model loaded (the main model), not attached to this one\n", __func__);
++        return;
++    }
+     const double mib = atof(env);
+ 
+     auto from_host = (fn_from_host_t) zc_proc("ggml_backend_cuda_buffer_from_host_ptr");
+@@ -165,6 +173,7 @@ void llama_moe_zc_attach(llama_model & model) {
+     LLAMA_LOG_INFO("%s: CPU experts: %s(gate) * up, %d layers with expert scales, %d with clamping\n", __func__,
+         act == 1 ? "GELU" : "SiLU", n_scaled, n_clamped);
+     start(model.moe_zc, n_used); // before the first graph is captured
++    g_zc_attached = true;
+ 
+     LLAMA_LOG_INFO("%s: zero-copy expert cache on: %d layers, slot %.2f MiB, %d slots\n", __func__,
+         n_layer, slot_bytes / 1048576.0, n_slots);
+@@ -177,6 +186,7 @@ void llama_moe_zc_detach(llama_model & model) {
+             fr(model.moe_zc);
+         }
+         model.moe_zc = nullptr;
++        g_zc_attached = false;
+     }
+     for (auto b : model.moe_zc_bufs) {
+         ggml_backend_buffer_free(b);
+-- 
+2.45.2.windows.1
+
