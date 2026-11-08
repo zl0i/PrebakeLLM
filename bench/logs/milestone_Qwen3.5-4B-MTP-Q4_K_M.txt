@@ -1,0 +1,15 @@
+round 0 llama.cpp default (-ngl 99)        short  120.8  long  110.3  pp_long 6399.2  acc 0.00  CPU  5.5%  GPU 149.3 W  20261108-051804_ms_Qwen3.5-4B-M_llama_cpp_default___ngl_99__r0.jsonl
+round 0 llama.cpp + MTP 2 (same as aic)    short  176.2  long  154.4  pp_long 4835.5  acc 0.69  CPU  5.8%  GPU 160.0 W  20261108-051830_ms_Qwen3.5-4B-M_llama_cpp___MTP_2__same_as_aic__r0.jsonl
+round 0 ours (aic build)                   short  172.2  long  149.6  pp_long 4821.8  acc 0.69  CPU  5.9%  GPU 154.7 W  20261108-051850_ms_Qwen3.5-4B-M_ours__aic_build__r0.jsonl
+round 1 llama.cpp default (-ngl 99)        short  120.5  long  109.1  pp_long 6457.9  acc 0.00  CPU  5.8%  GPU 149.1 W  20261108-051911_ms_Qwen3.5-4B-M_llama_cpp_default___ngl_99__r1.jsonl
+round 1 llama.cpp + MTP 2 (same as aic)    short  172.6  long  148.6  pp_long 4869.8  acc 0.69  CPU  7.3%  GPU 154.8 W  20261108-051936_ms_Qwen3.5-4B-M_llama_cpp___MTP_2__same_as_aic__r1.jsonl
+round 1 ours (aic build)                   short  171.6  long  147.1  pp_long 4759.2  acc 0.69  CPU  9.7%  GPU 154.6 W  20261108-051957_ms_Qwen3.5-4B-M_ours__aic_build__r1.jsonl
+
+model: Qwen3.5-4B-MTP-Q4_K_M.gguf
+| Contender | short, tok/s | long 17K, tok/s | prompt 17K, tok/s | draft accepted | CPU busy | GPU power | GPU J/token (short) | short/long per round |
+|---|---|---|---|---|---|---|---|---|
+| llama.cpp default (-ngl 99) | 120.7 | 109.7 | 6429 | nan% | 6% | 149 W | 1.24 | 120.8/110.3, 120.5/109.1 |
+| llama.cpp + MTP 2 (same as aic) | 174.4 | 151.5 | 4853 | 69% | 7% | 157 W | 0.90 | 176.2/154.4, 172.6/148.6 |
+| ours (aic build) | 171.9 | 148.4 | 4791 | 69% | 8% | 155 W | 0.90 | 172.2/149.6, 171.6/147.1 |
+
+raw: D:\Projects\Work\ai\bench\milestone_results_Qwen3.5-4B-MTP-Q4_K_M.json

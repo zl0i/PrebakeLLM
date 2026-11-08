@@ -1,0 +1,161 @@
+{
+ "model": "D:\\Projects\\Work\\ai\\models\\Qwen3.5-2B-MTP-Q8_0.gguf",
+ "model_fingerprint": "ce7438359959",
+ "hardware": {
+  "gpu": "NVIDIA GeForce RTX 4070 SUPER",
+  "vram_mib": 12282,
+  "driver": "621.01",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-13700KF",
+  "ram_gib": 63
+ },
+ "power_plan": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+ "model_info": {
+  "n_expert": 0,
+  "size_mib": 1980,
+  "tokenizer": "qwen35:248320:3efeb133134b"
+ },
+ "engine": "f3d308026e9b",
+ "built": "2026-11-08 05:10:43",
+ "build_seconds": 44,
+ "fixed_vram_mib": null,
+ "config": {
+  "mode": "gpu",
+  "ctx": 20480,
+  "draft_type": "mtp",
+  "mtp_file": "embedded",
+  "draft_n": 2
+ },
+ "expected_tg": 221.8,
+ "trials": [
+  {
+   "cfg": {
+    "mode": "gpu",
+    "ctx": 20480,
+    "draft_n": 0
+   },
+   "tg": 174.68155278866465,
+   "tg_all": [
+    174.59346625130257,
+    174.76963932602672,
+    175.16028818824773,
+    175.5168363697378,
+    173.84515972434062,
+    169.7176709185035
+   ],
+   "vram_free_before": 11644,
+   "vram_free_loaded": 9209,
+   "load_s": 3.7,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "gpu",
+    "ctx": 20480,
+    "draft_type": "mtp",
+    "mtp_file": "embedded",
+    "draft_n": 1
+   },
+   "tg": 207.75952912033398,
+   "tg_all": [
+    222.34186109926375,
+    207.56909178731348,
+    194.40980118846747,
+    222.43361965249989,
+    207.94996645335448,
+    195.3480143304355
+   ],
+   "vram_free_before": 11643,
+   "vram_free_loaded": 9037,
+   "load_s": 1.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "gpu",
+    "ctx": 20480,
+    "draft_type": "mtp",
+    "mtp_file": "embedded",
+    "draft_n": 2
+   },
+   "tg": 219.68312102646672,
+   "tg_all": [
+    260.2887732049897,
+    219.29673330620858,
+    196.3678129689208,
+    262.3359781419683,
+    220.0695087467249,
+    196.37654399513877
+   ],
+   "vram_free_before": 11644,
+   "vram_free_loaded": 9020,
+   "load_s": 1.5,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "gpu",
+    "ctx": 20480,
+    "draft_type": "mtp",
+    "mtp_file": "embedded",
+    "draft_n": 3
+   },
+   "tg": 209.8125509139632,
+   "tg_all": [
+    276.61169806528386,
+    207.68811775785656,
+    185.7342108398691,
+    277.29720679744395,
+    211.93698407006985,
+    190.61182800339503
+   ],
+   "vram_free_before": 11648,
+   "vram_free_loaded": 9005,
+   "load_s": 1.5,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "gpu",
+    "ctx": 20480,
+    "draft_type": "mtp",
+    "mtp_file": "embedded",
+    "draft_n": 2
+   },
+   "tg": 223.77200733587188,
+   "tg_all": [
+    267.0487086767317,
+    223.6123377755776,
+    198.9920240492499,
+    267.0209032024036,
+    223.93167689616612,
+    198.95641728293103
+   ],
+   "vram_free_before": 11648,
+   "vram_free_loaded": 9025,
+   "load_s": 1.5,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "gpu",
+    "ctx": 20480,
+    "draft_type": "mtp",
+    "mtp_file": "embedded",
+    "draft_n": 3
+   },
+   "tg": 214.44668292396756,
+   "tg_all": [
+    280.4786836200449,
+    214.6160262830394,
+    190.22324312683944,
+    281.7545333241187,
+    214.27733956489573,
+    190.95933647035088
+   ],
+   "vram_free_before": 11648,
+   "vram_free_loaded": 9005,
+   "load_s": 1.5,
+   "ok": true
+  }
+ ]
+}

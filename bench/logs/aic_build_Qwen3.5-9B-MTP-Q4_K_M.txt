@@ -1,0 +1,11 @@
+hardware: {'gpu': 'NVIDIA GeForce RTX 4070 SUPER', 'vram_mib': 12282, 'driver': '621.01', 'cpu': '13th Gen Intel(R) Core(TM) i7-13700KF', 'ram_gib': 63}
+model: 5596 MiB, dense; VRAM free 11639 MiB; modes to try: ['gpu']; MTP head: embedded; small drafts: ['Qwen3.5-0.8B-Q8_0.gguf']
+  gpu, draft none -> 77.6 tok/s, VRAM free 5749 MiB
+  gpu, draft mtp 1 -> 109.0 tok/s, VRAM free 5353 MiB
+  gpu, draft mtp 2 -> 126.8 tok/s, VRAM free 5308 MiB
+  gpu, draft mtp 3 -> 123.2 tok/s, VRAM free 5258 MiB
+  gpu, draft simple 4 (Qwen3.5-0.8B-Q8_0.gguf) -> 53.9 tok/s, VRAM free 4675 MiB
+  gpu, draft simple 8 (Qwen3.5-0.8B-Q8_0.gguf) -> 47.9 tok/s, VRAM free 4674 MiB
+  gpu, draft mtp 2 -> 128.3 tok/s, VRAM free 5308 MiB
+  gpu, draft mtp 3 -> 123.0 tok/s, VRAM free 5258 MiB
+best: {'mode': 'gpu', 'ctx': 20480, 'draft_type': 'mtp', 'mtp_file': 'embedded', 'draft_n': 2} -> 127.1 tok/s; saved D:\Projects\Work\ai\cache\Qwen3.5-9B-MTP-Q4_K_M__ba1f8207.json (build took 120 s)

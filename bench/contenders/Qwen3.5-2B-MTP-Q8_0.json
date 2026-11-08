@@ -1,0 +1,4 @@
+[
+ {"name": "llama.cpp default (-ngl 99)", "server": "", "args": ["-ngl", "99", "-t", "8"]},
+ {"name": "llama.cpp + MTP 2 (same as aic)", "server": "", "args": ["-ngl", "99", "-lm", "none", "-t", "8", "--spec-type", "draft-mtp", "--spec-draft-n-max", "2"]}
+]
