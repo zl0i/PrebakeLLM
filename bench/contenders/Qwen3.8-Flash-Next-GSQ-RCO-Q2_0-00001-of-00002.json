@@ -1,0 +1,4 @@
+[
+ {"name": "llama.cpp best (MTP 3, head experts in RAM, cache 5500)", "server": "", "args": ["-ngl", "99", "-cmoe", "--moe-cache-mib", "5500", "-lm", "none", "-t", "8", "-md", "models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf", "-cmoed", "--spec-type", "draft-mtp", "--spec-draft-n-max", "3"]},
+ {"name": "llama.cpp no draft (cache 6500)", "server": "", "args": ["-ngl", "99", "-cmoe", "--moe-cache-mib", "6500", "-lm", "none", "-t", "8"]}
+]

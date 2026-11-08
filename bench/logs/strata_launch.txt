@@ -1,0 +1,56 @@
+    Checking the engine for this computer…
+    No engine is installed yet. Getting the one for your graphics card…
+    Reading the signed update feed
+    Downloading engine 0.1.58 windows-x86_64-cuda-cuda13 (631 MB)
+    Downloading the engine… 10%
+    Downloading the engine… 20%
+    Downloading the engine… 30%
+    Downloading the engine… 40%
+    Downloading the engine… 50%
+    Downloading the engine… 60%
+    Downloading the engine… 70%
+    Downloading the engine… 80%
+    Downloading the engine… 90%
+    Downloading the engine… 100%
+    Unpacking 0.1.58 windows-x86_64-cuda-cuda13
+    Checking the package signature and every file
+    Test-starting engine 0.1.58 windows-x86_64-cuda-cuda13 before switching to it
+    Switching to engine 0.1.58 windows-x86_64-cuda-cuda13
+    Engine 0.1.58 is installed and will be used on the next start
+    The engine is installed.
+    Preparing Qwen3.8-Flash-Next Q2_0 from your model files…
+    Getting your model ready
+    Checking your computer
+    Getting the helper packages ready
+    Checking the engine for this PC
+    Getting the model files
+    The model files are on this computer; checking them
+    Preparing your model for Strata (one time)
+    Preparing the model data for the engine (one time)
+    Preparing the draft layer
+    Downloading the draft layer (about 5 GB; it makes answers about twice as fast)
+    Downloading the draft layer (about 5 GB; it makes answers about twice as fast): 0.7 of 5.2 GB
+    Downloading the draft layer (about 5 GB; it makes answers about twice as fast): 1.2 of 5.2 GB
+    Downloading the draft layer (about 5 GB; it makes answers about twice as fast): 1.8 of 5.2 GB
+    Downloading the draft layer (about 5 GB; it makes answers about twice as fast): 2.3 of 5.2 GB
+    Downloading the draft layer (about 5 GB; it makes answers about twice as fast): 2.9 of 5.2 GB
+    Downloading the draft layer (about 5 GB; it makes answers about twice as fast): 3.5 of 5.2 GB
+    Downloading the draft layer (about 5 GB; it makes answers about twice as fast): 4.1 of 5.2 GB
+    Downloading the draft layer (about 5 GB; it makes answers about twice as fast): 4.9 of 5.2 GB
+    Saving the model's settings
+    Qwen3.8-Flash-Next Q2_0 is ready.
+    Writing this launch's settings…
+    Settings are saved.
+    Starting the engine and loading the model. The first start can take a few minutes.
+    Loading the model… 15 s
+    The model is loaded and answering.
+    Ready: http://127.0.0.1:8091
+    Strata is serving.
+
+Strata is serving.
+  This computer  http://127.0.0.1:8091/v1
+  Anthropic apps http://127.0.0.1:8091   (Claude Code: ANTHROPIC_BASE_URL, no /v1 at the end)
+  Engine log     C:\Users\Dmitri\AppData\Local\Strata\launch\q2_0-32k.engine.log   (follow it: strata logs --follow)
+  Watch it:    strata monitor --url http://127.0.0.1:8091
+  Connect an app:  strata connect opencode      Stop:  strata launch --stop
+  To keep these settings for next time, add --save-preset NAME.

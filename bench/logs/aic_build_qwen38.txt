@@ -1,0 +1,22 @@
+hardware: {'gpu': 'NVIDIA GeForce RTX 4070 SUPER', 'vram_mib': 12282, 'driver': '621.01', 'cpu': '13th Gen Intel(R) Core(TM) i7-13700KF', 'ram_gib': 63}
+model: 63346 MiB, MoE, 512 experts; VRAM free 11484 MiB; modes to try: ['moe-zc']; MTP heads: ['mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf']; small drafts: none
+fixed VRAM use (dense weights, KV, buffers): 4327 MiB -> expert cache up to 6457 MiB
+fixed VRAM use (dense weights, KV, buffers, draft): 7111 MiB -> expert cache up to 3692 MiB
+  moe-zc,  6457 MiB cache, 8 CPU threads, draft none -> 47.4 tok/s, VRAM free 701 MiB
+  moe-zc,  5945 MiB cache, 8 CPU threads, draft none -> 44.5 tok/s, VRAM free 1214 MiB
+  moe-zc,  3692 MiB cache, 8 CPU threads, draft mtp 1 -> 47.5 tok/s, VRAM free 824 MiB
+  moe-zc,  3180 MiB cache, 8 CPU threads, draft mtp 1 -> 46.9 tok/s, VRAM free 1344 MiB
+  moe-zc,  3692 MiB cache, 8 CPU threads, draft mtp 2 -> 46.9 tok/s, VRAM free 721 MiB
+  moe-zc,  3180 MiB cache, 8 CPU threads, draft mtp 2 -> 48.1 tok/s, VRAM free 1212 MiB
+  moe-zc,  3692 MiB cache, 8 CPU threads, draft mtp 3 -> 46.7 tok/s, VRAM free 606 MiB
+  moe-zc,  3180 MiB cache, 8 CPU threads, draft mtp 3 -> 44.9 tok/s, VRAM free 1097 MiB
+fixed VRAM use (dense weights, KV, buffers, draft): 6135 MiB -> expert cache up to 4670 MiB
+  moe-zc,  4670 MiB cache, 8 CPU threads, draft mtp 2 (head experts in RAM) -> 32.9 tok/s, VRAM free 701 MiB
+  moe-zc,  4158 MiB cache, 8 CPU threads, draft mtp 2 (head experts in RAM) -> 32.0 tok/s, VRAM free 1215 MiB
+  moe-zc,  4670 MiB cache, 8 CPU threads, draft mtp 3 (head experts in RAM) -> 29.9 tok/s, VRAM free 584 MiB
+  moe-zc,  4158 MiB cache, 8 CPU threads, draft mtp 3 (head experts in RAM) -> 28.9 tok/s, VRAM free 1100 MiB
+  moe-zc,  3180 MiB cache, 4 CPU threads, draft mtp 2 -> 36.0 tok/s, VRAM free 1215 MiB
+  moe-zc,  3180 MiB cache, 6 CPU threads, draft mtp 2 -> 44.5 tok/s, VRAM free 1232 MiB
+  moe-zc,  3180 MiB cache, 8 CPU threads, draft mtp 2 -> 48.1 tok/s, VRAM free 1230 MiB
+  moe-zc,  3692 MiB cache, 8 CPU threads, draft mtp 1 -> 47.1 tok/s, VRAM free 832 MiB
+best: {'mode': 'moe-zc', 'mtp_file': 'mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf', 'draft_type': 'mtp', 'draft_n': 2, 'cpu_threads': 8, 'ctx': 20480, 'cache_mib': 3180} -> 48.1 tok/s; saved D:\Projects\Work\ai\cache\Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002__ba1f8207.json (build took 968 s)

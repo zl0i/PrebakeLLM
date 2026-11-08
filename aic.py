@@ -181,8 +181,9 @@ def server_args(model: pathlib.Path, cfg: dict) -> list:
     if dt == "mtp":
         if cfg["mtp_file"] != "embedded":
             args += ["-md", str(model.parent / cfg["mtp_file"])]
-        if cfg.get("draft_cpu_moe"):   # the MTP head's own experts stay in RAM (plain llama.cpp CPU path)
-            args += ["-cmoed"]
+        if cfg.get("draft_cpu_moe"):   # the MTP head's own experts stay in RAM (plain llama.cpp CPU path,
+            # which needs its own threads: the main model runs with -t 1 in moe-zc mode)
+            args += ["-cmoed", "-td", str(cfg.get("draft_threads", 8))]
         args += ["--spec-type", "draft-mtp", "--spec-draft-n-max", str(cfg["draft_n"])]
     elif dt == "simple":
         args += ["-md", str(model.parent / cfg["draft_model"]), "-ngld", "99",

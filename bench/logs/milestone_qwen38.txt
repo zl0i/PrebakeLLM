@@ -1,0 +1,15 @@
+round 0 llama.cpp best (MTP 3, head experts in RAM, cache 5500) short   48.9  long   50.3  pp_long  236.5  acc 0.72  CPU 33.2%  GPU  71.9 W  20261108-093652_ms_Qwen3.8-Flas_llama_cpp_best__MTP_3__head_experts_in_RAM__cache_5500__r0.jsonl
+round 0 llama.cpp no draft (cache 6500)    short   40.3  long   38.8  pp_long  328.3  acc 0.00  CPU  6.2%  GPU  81.8 W  20261108-093928_ms_Qwen3.8-Flas_llama_cpp_no_draft__cache_6500__r0.jsonl
+round 0 ours (aic build)                   short   46.8  long   49.9  pp_long  403.9  acc 0.78  CPU 35.5%  GPU  62.5 W  20261108-094148_ms_Qwen3.8-Flas_ours__aic_build__r0.jsonl
+round 1 llama.cpp best (MTP 3, head experts in RAM, cache 5500) short   49.0  long   50.4  pp_long  243.9  acc 0.71  CPU 33.3%  GPU  72.9 W  20261108-094353_ms_Qwen3.8-Flas_llama_cpp_best__MTP_3__head_experts_in_RAM__cache_5500__r1.jsonl
+round 1 llama.cpp no draft (cache 6500)    short   40.3  long   40.0  pp_long  328.9  acc 0.00  CPU  6.0%  GPU  79.0 W  20261108-094625_ms_Qwen3.8-Flas_llama_cpp_no_draft__cache_6500__r1.jsonl
+round 1 ours (aic build)                   short   46.7  long   48.9  pp_long  403.6  acc 0.78  CPU 35.4%  GPU  64.4 W  20261108-094845_ms_Qwen3.8-Flas_ours__aic_build__r1.jsonl
+
+model: Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002.gguf
+| Contender | short, tok/s | long 17K, tok/s | prompt 17K, tok/s | draft accepted | CPU busy | GPU power | GPU J/token (short) | short/long per round |
+|---|---|---|---|---|---|---|---|---|
+| llama.cpp best (MTP 3, head experts in RAM, cache 5500) | 49.0 | 50.4 | 240 | 71% | 33% | 72 W | 1.48 | 48.9/50.3, 49.0/50.4 |
+| llama.cpp no draft (cache 6500) | 40.3 | 39.4 | 329 | nan% | 6% | 80 W | 2.00 | 40.3/38.8, 40.3/40.0 |
+| ours (aic build) | 46.8 | 49.4 | 404 | 78% | 35% | 63 W | 1.36 | 46.8/49.9, 46.7/48.9 |
+
+raw: D:\Projects\Work\ai\bench\milestone_results_Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002.json

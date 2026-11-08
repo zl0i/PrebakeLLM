@@ -1,0 +1,9 @@
+    Checking the engine for this computer…
+    Engine 0.1.58 (cuda) is installed.
+    Preparing qwen36 UD-Q4_K_XL from your model files…
+    Getting your model ready
+    Checking your computer
+    Getting the helper packages ready
+    Checking the engine for this PC
+    Getting the model files
+strata: The model could not be installed. D:\Projects\Work\ai\models\Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf is missing. put Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf in D:\Projects\Work\ai\models, or drop --gguf-dir to download it Details: C:\Users\Dmitri\AppData\Local\Strata\launch\ud-q4_k_xl-32k.setup.log
