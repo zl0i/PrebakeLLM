@@ -1,0 +1,10 @@
+hardware: {'gpu': 'NVIDIA GeForce RTX 4070 SUPER', 'vram_mib': 12282, 'driver': '621.01', 'cpu': '13th Gen Intel(R) Core(TM) i7-13700KF', 'ram_gib': 63}
+model: 17464 MiB, MoE, 64 experts; VRAM free 11630 MiB; modes to try: ['moe-zc']; MTP head: none; small drafts: none
+fixed VRAM use (dense weights, KV, buffers): 2646 MiB -> expert cache up to 8284 MiB
+  moe-zc,  8284 MiB cache, 8 CPU threads, draft none -> 83.9 tok/s, VRAM free 700 MiB
+  moe-zc,  7772 MiB cache, 8 CPU threads, draft none -> 81.6 tok/s, VRAM free 1218 MiB
+  moe-zc,  8284 MiB cache, 4 CPU threads, draft none -> 81.0 tok/s, VRAM free 706 MiB
+  moe-zc,  8284 MiB cache, 6 CPU threads, draft none -> 84.8 tok/s, VRAM free 706 MiB
+  moe-zc,  8284 MiB cache, 6 CPU threads, draft none -> 84.6 tok/s, VRAM free 706 MiB
+  moe-zc,  8284 MiB cache, 8 CPU threads, draft none -> 83.7 tok/s, VRAM free 706 MiB
+best: {'mode': 'moe-zc', 'mtp_file': None, 'draft_type': None, 'draft_n': 0, 'cpu_threads': 6, 'ctx': 20480, 'cache_mib': 8284} -> 84.6 tok/s; saved D:\Projects\Work\ai\cache\GLM-4.7-Flash-Q4_K_M__ba1f8207.json (build took 145 s)

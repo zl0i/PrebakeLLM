@@ -125,7 +125,7 @@ def find_small_drafts(model: pathlib.Path, info: dict) -> list:
     smallest first, at most two; a draft must be at most a third of the model."""
     out = []
     for p in sorted(model.parent.glob("*.gguf"), key=lambda p: p.stat().st_size):
-        if p == model or p.name.startswith(("mtp-", "dflash-")) or "-of-0" in p.name and "-00001-of-" not in p.name:
+        if p == model or p.name.startswith(("mtp-", "dflash-")) or "-MTP-" in p.name or "-of-0" in p.name and "-00001-of-" not in p.name:
             continue
         if p.stat().st_size // 1048576 > info["size_mib"] // 3:
             break

@@ -1,0 +1,4 @@
+[
+ {"name": "llama.cpp best (cache8500 t6)", "server": "", "args": ["-ngl", "99", "-cmoe", "-lm", "none", "-t", "6", "--moe-cache-mib", "8500"]},
+ {"name": "ik_llama.cpp best (cache8500 t8)", "server": "build/ik/bin/llama-server.exe", "plain": true, "args": ["-ngl", "99", "-cmoe", "--moe-cache-mib", "8500", "-nmm", "-t", "8"]}
+]

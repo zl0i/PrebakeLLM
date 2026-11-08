@@ -1,0 +1,22 @@
+hardware: {'gpu': 'NVIDIA GeForce RTX 4070 SUPER', 'vram_mib': 12282, 'driver': '621.01', 'cpu': '13th Gen Intel(R) Core(TM) i7-13700KF', 'ram_gib': 63}
+warning: no prompts made with this model's chat template, using calib_prompts.json (bench/make_model_prompts.py)
+model: 21109 MiB, MoE, 256 experts; VRAM free 11638 MiB; modes to try: ['moe-zc']; MTP head: mtp-Qwen3.6-35B-A3B-Q4_0.gguf; small drafts: ['Qwen3.5-0.8B-Q8_0.gguf', 'Qwen3.5-2B-Q8_0.gguf']
+fixed VRAM use (dense weights, KV, buffers, draft): 3699 MiB -> expert cache up to 7239 MiB
+fixed VRAM use (dense weights, KV, buffers): 2710 MiB -> expert cache up to 8228 MiB
+  moe-zc,  8228 MiB cache, 8 CPU threads, draft none -> 88.6 tok/s, VRAM free 719 MiB
+  moe-zc,  7716 MiB cache, 8 CPU threads, draft none -> 87.6 tok/s, VRAM free 1212 MiB
+  moe-zc,  7239 MiB cache, 8 CPU threads, draft mtp 1 -> 104.4 tok/s, VRAM free 764 MiB
+  moe-zc,  6727 MiB cache, 8 CPU threads, draft mtp 1 -> 106.1 tok/s, VRAM free 1276 MiB
+  moe-zc,  7239 MiB cache, 8 CPU threads, draft mtp 2 -> 121.8 tok/s, VRAM free 700 MiB
+  moe-zc,  6727 MiB cache, 8 CPU threads, draft mtp 2 -> 118.8 tok/s, VRAM free 1212 MiB
+  moe-zc,  7239 MiB cache, 8 CPU threads, draft mtp 3 -> 116.2 tok/s, VRAM free 638 MiB
+  moe-zc,  6727 MiB cache, 8 CPU threads, draft mtp 3 -> 110.5 tok/s, VRAM free 1150 MiB
+  moe-zc,  6942 MiB cache, 8 CPU threads, draft simple 2 (Qwen3.5-0.8B-Q8_0.gguf) -> 32.1 tok/s, VRAM free 906 MiB
+  moe-zc,  6942 MiB cache, 8 CPU threads, draft simple 3 (Qwen3.5-0.8B-Q8_0.gguf) -> 31.0 tok/s, VRAM free 910 MiB
+  moe-zc,  5798 MiB cache, 8 CPU threads, draft simple 2 (Qwen3.5-2B-Q8_0.gguf) -> 38.4 tok/s, VRAM free 888 MiB
+  moe-zc,  5798 MiB cache, 8 CPU threads, draft simple 3 (Qwen3.5-2B-Q8_0.gguf) -> 34.3 tok/s, VRAM free 888 MiB
+  moe-zc,  7239 MiB cache, 4 CPU threads, draft mtp 2 -> 117.6 tok/s, VRAM free 704 MiB
+  moe-zc,  7239 MiB cache, 6 CPU threads, draft mtp 2 -> 126.3 tok/s, VRAM free 704 MiB
+  moe-zc,  7239 MiB cache, 6 CPU threads, draft mtp 2 -> 124.3 tok/s, VRAM free 704 MiB
+  moe-zc,  7239 MiB cache, 8 CPU threads, draft mtp 2 -> 121.2 tok/s, VRAM free 704 MiB
+best: {'mode': 'moe-zc', 'mtp_file': 'mtp-Qwen3.6-35B-A3B-Q4_0.gguf', 'draft_type': 'mtp', 'draft_n': 2, 'cpu_threads': 6, 'ctx': 20480, 'cache_mib': 7239} -> 124.9 tok/s; saved D:\Projects\Work\ai\cache\Qwen3.6-35B-A3B-UD-Q4_K_M__ba1f8207.json (build took 452 s)

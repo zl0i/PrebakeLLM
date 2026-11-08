@@ -1,0 +1,421 @@
+{
+ "model": "D:\\Projects\\Work\\ai\\models\\Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+ "model_fingerprint": "74a194f3a3be",
+ "hardware": {
+  "gpu": "NVIDIA GeForce RTX 4070 SUPER",
+  "vram_mib": 12282,
+  "driver": "621.01",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-13700KF",
+  "ram_gib": 63
+ },
+ "power_plan": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+ "model_info": {
+  "n_expert": 256,
+  "size_mib": 21109,
+  "tokenizer": "qwen35:248320:3efeb133134b"
+ },
+ "engine": "82c16b3bfddd",
+ "built": "2026-11-08 03:50:50",
+ "build_seconds": 452,
+ "fixed_vram_mib": 3699,
+ "config": {
+  "mode": "moe-zc",
+  "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+  "draft_type": "mtp",
+  "draft_n": 2,
+  "cpu_threads": 6,
+  "ctx": 20480,
+  "cache_mib": 7239
+ },
+ "expected_tg": 124.9,
+ "trials": [
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 0,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 8228
+   },
+   "tg": 88.59048473307348,
+   "tg_all": [
+    88.7571982646014,
+    89.06156002245024,
+    87.68490347215675,
+    86.42549062772628,
+    90.12542738724686,
+    88.42377120154558
+   ],
+   "vram_free_before": 11640,
+   "vram_free_loaded": 719,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 0,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7716
+   },
+   "tg": 87.6441042128017,
+   "tg_all": [
+    87.55477680139822,
+    89.20781774674518,
+    86.84675807606574,
+    85.77374934860502,
+    90.06875815008968,
+    87.73343162420517
+   ],
+   "vram_free_before": 11640,
+   "vram_free_loaded": 1212,
+   "load_s": 7.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 1,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7239
+   },
+   "tg": 104.41258706210945,
+   "tg_all": [
+    108.62243524668223,
+    104.13576159591003,
+    104.5349771403701,
+    102.90482856638042,
+    107.25748677494951,
+    104.29019698384879
+   ],
+   "vram_free_before": 11640,
+   "vram_free_loaded": 764,
+   "load_s": 7.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 1,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6727
+   },
+   "tg": 106.10097638363247,
+   "tg_all": [
+    108.16400111565385,
+    106.50333476007611,
+    99.43702384362247,
+    100.12203553765534,
+    110.30299330412271,
+    105.69861800718883
+   ],
+   "vram_free_before": 11640,
+   "vram_free_loaded": 1276,
+   "load_s": 7.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7239
+   },
+   "tg": 121.79859716355531,
+   "tg_all": [
+    129.18888878055438,
+    115.74756547927136,
+    121.7457886676876,
+    119.77310905379244,
+    129.52017256322867,
+    121.85140565942302
+   ],
+   "vram_free_before": 11640,
+   "vram_free_loaded": 700,
+   "load_s": 7.7,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6727
+   },
+   "tg": 118.83699222128274,
+   "tg_all": [
+    119.26407316063296,
+    120.27595388665314,
+    116.77361122025486,
+    115.71774477032211,
+    118.40991128193252,
+    119.74262114338387
+   ],
+   "vram_free_before": 11640,
+   "vram_free_loaded": 1212,
+   "load_s": 7.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7239
+   },
+   "tg": 116.15339002123366,
+   "tg_all": [
+    117.55312070265715,
+    119.40710990485732,
+    110.41145279250702,
+    111.8166263587654,
+    115.15347278249898,
+    117.15330725996836
+   ],
+   "vram_free_before": 11640,
+   "vram_free_loaded": 638,
+   "load_s": 7.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6727
+   },
+   "tg": 110.46179823499477,
+   "tg_all": [
+    111.35841862641142,
+    109.56517784357814,
+    105.70346654186123,
+    108.77179540504153,
+    122.79319772021688,
+    111.87610600788761
+   ],
+   "vram_free_before": 11640,
+   "vram_free_loaded": 1150,
+   "load_s": 7.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "simple",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6942,
+    "draft_model": "Qwen3.5-0.8B-Q8_0.gguf"
+   },
+   "tg": 32.06829690915384,
+   "tg_all": [
+    46.26146280491105,
+    30.200634783153745,
+    32.22645917961569,
+    41.66033464515351,
+    30.05660850303345,
+    31.910134638691982
+   ],
+   "vram_free_before": 11639,
+   "vram_free_loaded": 906,
+   "load_s": 8.4,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "simple",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 6942,
+    "draft_model": "Qwen3.5-0.8B-Q8_0.gguf"
+   },
+   "tg": 31.011070423546926,
+   "tg_all": [
+    42.249108716522564,
+    30.348208472723545,
+    31.634910058369393,
+    47.56673702953804,
+    29.155919623547568,
+    30.387230788724462
+   ],
+   "vram_free_before": 11639,
+   "vram_free_loaded": 910,
+   "load_s": 7.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "simple",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 5798,
+    "draft_model": "Qwen3.5-2B-Q8_0.gguf"
+   },
+   "tg": 38.416176853730356,
+   "tg_all": [
+    41.70611041732078,
+    41.47901109863552,
+    34.68772538840435,
+    40.080352283609585,
+    36.75200142385113,
+    34.46013644913651
+   ],
+   "vram_free_before": 11644,
+   "vram_free_loaded": 888,
+   "load_s": 10.2,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "simple",
+    "draft_n": 3,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 5798,
+    "draft_model": "Qwen3.5-2B-Q8_0.gguf"
+   },
+   "tg": 34.30172196437445,
+   "tg_all": [
+    48.75102331157423,
+    30.74993879021618,
+    33.52468407729316,
+    39.19696028805575,
+    34.07184230094223,
+    34.531601627806666
+   ],
+   "vram_free_before": 11644,
+   "vram_free_loaded": 888,
+   "load_s": 8.1,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 4,
+    "ctx": 20480,
+    "cache_mib": 7239
+   },
+   "tg": 117.59343357554744,
+   "tg_all": [
+    125.56315866366052,
+    112.88564825825964,
+    116.26266001654001,
+    115.41728065272464,
+    130.17624553696064,
+    118.92420713455488
+   ],
+   "vram_free_before": 11644,
+   "vram_free_loaded": 704,
+   "load_s": 7.7,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 6,
+    "ctx": 20480,
+    "cache_mib": 7239
+   },
+   "tg": 126.30072633669437,
+   "tg_all": [
+    131.90992294469407,
+    121.47215079048574,
+    124.96473086605275,
+    117.62921643405922,
+    132.7870413209889,
+    127.63672180733599
+   ],
+   "vram_free_before": 11644,
+   "vram_free_loaded": 704,
+   "load_s": 7.7,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 6,
+    "ctx": 20480,
+    "cache_mib": 7239
+   },
+   "tg": 124.33201748876083,
+   "tg_all": [
+    129.1889937477402,
+    119.5003532400379,
+    123.75977527092883,
+    121.89213389429268,
+    133.38445005759021,
+    124.90425970659282
+   ],
+   "vram_free_before": 11644,
+   "vram_free_loaded": 704,
+   "load_s": 7.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "moe-zc",
+    "mtp_file": "mtp-Qwen3.6-35B-A3B-Q4_0.gguf",
+    "draft_type": "mtp",
+    "draft_n": 2,
+    "cpu_threads": 8,
+    "ctx": 20480,
+    "cache_mib": 7239
+   },
+   "tg": 121.15881323217461,
+   "tg_all": [
+    128.7376424008356,
+    115.71193404856407,
+    120.9258815610847,
+    116.40182201795369,
+    126.75433176949844,
+    121.39174490326452
+   ],
+   "vram_free_before": 11644,
+   "vram_free_loaded": 704,
+   "load_s": 7.6,
+   "ok": true
+  }
+ ]
+}

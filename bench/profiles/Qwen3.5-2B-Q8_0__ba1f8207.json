@@ -1,0 +1,69 @@
+{
+ "model": "D:\\Projects\\Work\\ai\\models\\Qwen3.5-2B-Q8_0.gguf",
+ "model_fingerprint": "dc0ea1e9b347",
+ "hardware": {
+  "gpu": "NVIDIA GeForce RTX 4070 SUPER",
+  "vram_mib": 12282,
+  "driver": "621.01",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-13700KF",
+  "ram_gib": 63
+ },
+ "power_plan": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+ "model_info": {
+  "n_expert": 0,
+  "size_mib": 1918,
+  "tokenizer": "qwen35:248320:3efeb133134b"
+ },
+ "engine": "82c16b3bfddd",
+ "built": "2026-11-08 01:22:52",
+ "build_seconds": 16,
+ "fixed_vram_mib": null,
+ "config": {
+  "mode": "gpu",
+  "ctx": 20480,
+  "draft_n": 0
+ },
+ "expected_tg": 171.6,
+ "trials": [
+  {
+   "cfg": {
+    "mode": "gpu",
+    "ctx": 20480,
+    "draft_n": 0
+   },
+   "tg": 171.65223560378183,
+   "tg_all": [
+    171.73519513006508,
+    171.31257757550682,
+    171.68772270813088,
+    171.72351002854498,
+    171.6167484994328,
+    168.89200471622956
+   ],
+   "vram_free_before": 11262,
+   "vram_free_loaded": 8823,
+   "load_s": 1.6,
+   "ok": true
+  },
+  {
+   "cfg": {
+    "mode": "gpu",
+    "ctx": 20480,
+    "draft_n": 0
+   },
+   "tg": 171.62082604756398,
+   "tg_all": [
+    172.01071875598387,
+    171.6412029565467,
+    171.60100499909342,
+    171.381083624268,
+    171.64064709603457,
+    169.96676561796815
+   ],
+   "vram_free_before": 11261,
+   "vram_free_loaded": 8823,
+   "load_s": 1.5,
+   "ok": true
+  }
+ ]
+}

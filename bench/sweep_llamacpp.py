@@ -129,6 +129,15 @@ STAGES = {
         ("ik_cache8000_ger", "-ngl 99 -cmoe --moe-cache-mib 8000 -nmm -t 8 -ger"),
         ("ik_cache8000_rtr", "-ngl 99 -cmoe --moe-cache-mib 8000 -nmm -t 8 -rtr"),
         ("ik_cache8500", "-ngl 99 -cmoe --moe-cache-mib 8500 -nmm -t 8"),
+        ("ik_cache9000", "-ngl 99 -cmoe --moe-cache-mib 9000 -nmm -t 8"),
+        ("ik_cache9500", "-ngl 99 -cmoe --moe-cache-mib 9500 -nmm -t 8"),
+        ("ik_cache9000_t6", "-ngl 99 -cmoe --moe-cache-mib 9000 -nmm -t 6"),
+    ],
+    # the larger caches the first passes pointed to (GLM unsloth file is 0.5 GB smaller than meshllm's)
+    "glm_nodraft2": [
+        ("cache9000_t6", "-ngl 99 -cmoe --moe-cache-mib 9000 -lm none -t 6"),
+        ("cache9500_t6", "-ngl 99 -cmoe --moe-cache-mib 9500 -lm none -t 6"),
+        ("cache9000_t8", "-ngl 99 -cmoe --moe-cache-mib 9000 -lm none -t 8"),
     ],
 }
 
