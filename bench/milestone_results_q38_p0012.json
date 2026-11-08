@@ -1,0 +1,154 @@
+{
+ "ours 0012 off MTP2": [
+  {
+   "short": 55.39400887656721,
+   "long": 54.90749873643455,
+   "pp_long": 397.9321885840594,
+   "short_srv": 55.394666891739426,
+   "long_srv": 54.90841384234653,
+   "client_timed": true,
+   "acc": 0.7816268764851367,
+   "cpu_busy": 0.34875,
+   "gpu_w": 72.825,
+   "log": "20261108-151131_ms_Qwen3.8-Flas_ours_0012_off_MTP2_r0.jsonl"
+  },
+  {
+   "short": 56.25484833561101,
+   "long": 55.90593596073256,
+   "pp_long": 399.1657336009485,
+   "short_srv": 56.25092447420067,
+   "long_srv": 55.908105491359905,
+   "client_timed": true,
+   "acc": 0.7855930609699953,
+   "cpu_busy": 0.348875,
+   "gpu_w": 72.0375,
+   "log": "20261108-151919_ms_Qwen3.8-Flas_ours_0012_off_MTP2_r1.jsonl"
+  },
+  {
+   "short": 55.24823658603138,
+   "long": 57.009502813476225,
+   "pp_long": 398.5007924415262,
+   "short_srv": 55.248446348851694,
+   "long_srv": 57.01166324484899,
+   "client_timed": true,
+   "acc": 0.7941367636749511,
+   "cpu_busy": 0.34875,
+   "gpu_w": 73.325,
+   "log": "20261108-152705_ms_Qwen3.8-Flas_ours_0012_off_MTP2_r2.jsonl"
+  }
+ ],
+ "ours 0012 MTP2": [
+  {
+   "short": 56.28086879554246,
+   "long": 57.08544038301483,
+   "pp_long": 397.0043387452591,
+   "short_srv": 56.28075671485533,
+   "long_srv": 57.08829544424208,
+   "client_timed": true,
+   "acc": 0.8051002881610171,
+   "cpu_busy": 0.348375,
+   "gpu_w": 72.3125,
+   "log": "20261108-151329_ms_Qwen3.8-Flas_ours_0012_MTP2_r0.jsonl"
+  },
+  {
+   "short": 55.8937823373309,
+   "long": 55.70356563329772,
+   "pp_long": 399.34402436734456,
+   "short_srv": 55.89465934931689,
+   "long_srv": 55.70620503771965,
+   "client_timed": true,
+   "acc": 0.7874374332681563,
+   "cpu_busy": 0.35362499999999997,
+   "gpu_w": 73.8375,
+   "log": "20261108-152116_ms_Qwen3.8-Flas_ours_0012_MTP2_r1.jsonl"
+  },
+  {
+   "short": 55.5552422611233,
+   "long": 56.830473560777286,
+   "pp_long": 399.4747502621146,
+   "short_srv": 55.55601971209018,
+   "long_srv": 56.833935252997925,
+   "client_timed": true,
+   "acc": 0.7944939246522176,
+   "cpu_busy": 0.350125,
+   "gpu_w": 71.6125,
+   "log": "20261108-152903_ms_Qwen3.8-Flas_ours_0012_MTP2_r2.jsonl"
+  }
+ ],
+ "ours 0012 off nodraft": [
+  {
+   "short": 47.028453765112396,
+   "long": 48.43404655155173,
+   "pp_long": 455.5324249532372,
+   "short_srv": 47.0270571880653,
+   "long_srv": 48.43374757166485,
+   "client_timed": true,
+   "acc": null,
+   "cpu_busy": 0.361125,
+   "gpu_w": 83.3625,
+   "log": "20261108-151527_ms_Qwen3.8-Flas_ours_0012_off_nodraft_r0.jsonl"
+  },
+  {
+   "short": 47.24027306397975,
+   "long": 48.406770865752705,
+   "pp_long": 460.77886567252693,
+   "short_srv": 47.238256097714874,
+   "long_srv": 48.40891293514629,
+   "client_timed": true,
+   "acc": null,
+   "cpu_busy": 0.3575,
+   "gpu_w": 84.1125,
+   "log": "20261108-152314_ms_Qwen3.8-Flas_ours_0012_off_nodraft_r1.jsonl"
+  },
+  {
+   "short": 47.11012003781326,
+   "long": 47.910169671876346,
+   "pp_long": 453.4636999264765,
+   "short_srv": 47.106980180625925,
+   "long_srv": 47.910248885288205,
+   "client_timed": true,
+   "acc": null,
+   "cpu_busy": 0.3585,
+   "gpu_w": 83.4625,
+   "log": "20261108-153101_ms_Qwen3.8-Flas_ours_0012_off_nodraft_r2.jsonl"
+  }
+ ],
+ "ours 0012 nodraft": [
+  {
+   "short": 49.24571123559132,
+   "long": 49.15506301970453,
+   "pp_long": 455.20958428865623,
+   "short_srv": 49.24379220444734,
+   "long_srv": 49.154977741469494,
+   "client_timed": true,
+   "acc": null,
+   "cpu_busy": 0.35624999999999996,
+   "gpu_w": 82.675,
+   "log": "20261108-151724_ms_Qwen3.8-Flas_ours_0012_nodraft_r0.jsonl"
+  },
+  {
+   "short": 49.24197516573311,
+   "long": 49.32939301745562,
+   "pp_long": 459.8305432278279,
+   "short_srv": 49.24097751547982,
+   "long_srv": 49.329457907947365,
+   "client_timed": true,
+   "acc": null,
+   "cpu_busy": 0.35924999999999996,
+   "gpu_w": 80.1625,
+   "log": "20261108-152510_ms_Qwen3.8-Flas_ours_0012_nodraft_r1.jsonl"
+  },
+  {
+   "short": 49.21475212301586,
+   "long": 49.22098335689968,
+   "pp_long": 456.81743712432666,
+   "short_srv": 49.21296096445854,
+   "long_srv": 49.21934262259959,
+   "client_timed": true,
+   "acc": null,
+   "cpu_busy": 0.35775,
+   "gpu_w": 82.725,
+   "log": "20261108-153258_ms_Qwen3.8-Flas_ours_0012_nodraft_r2.jsonl"
+  }
+ ]
+}

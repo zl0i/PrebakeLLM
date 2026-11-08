@@ -1,0 +1,22 @@
+round 0 ours 0012 off MTP2                 short   55.4  long   54.9  pp_long  397.9  acc 0.78  CPU 34.9%  GPU  72.8 W  20261108-151131_ms_Qwen3.8-Flas_ours_0012_off_MTP2_r0.jsonl
+round 0 ours 0012 MTP2                     short   56.3  long   57.1  pp_long  397.0  acc 0.81  CPU 34.8%  GPU  72.3 W  20261108-151329_ms_Qwen3.8-Flas_ours_0012_MTP2_r0.jsonl
+round 0 ours 0012 off nodraft              short   47.0  long   48.4  pp_long  455.5  acc 0.00  CPU 36.1%  GPU  83.4 W  20261108-151527_ms_Qwen3.8-Flas_ours_0012_off_nodraft_r0.jsonl
+round 0 ours 0012 nodraft                  short   49.2  long   49.2  pp_long  455.2  acc 0.00  CPU 35.6%  GPU  82.7 W  20261108-151724_ms_Qwen3.8-Flas_ours_0012_nodraft_r0.jsonl
+round 1 ours 0012 off MTP2                 short   56.3  long   55.9  pp_long  399.2  acc 0.79  CPU 34.9%  GPU  72.0 W  20261108-151919_ms_Qwen3.8-Flas_ours_0012_off_MTP2_r1.jsonl
+round 1 ours 0012 MTP2                     short   55.9  long   55.7  pp_long  399.3  acc 0.79  CPU 35.4%  GPU  73.8 W  20261108-152116_ms_Qwen3.8-Flas_ours_0012_MTP2_r1.jsonl
+round 1 ours 0012 off nodraft              short   47.2  long   48.4  pp_long  460.8  acc 0.00  CPU 35.8%  GPU  84.1 W  20261108-152314_ms_Qwen3.8-Flas_ours_0012_off_nodraft_r1.jsonl
+round 1 ours 0012 nodraft                  short   49.2  long   49.3  pp_long  459.8  acc 0.00  CPU 35.9%  GPU  80.2 W  20261108-152510_ms_Qwen3.8-Flas_ours_0012_nodraft_r1.jsonl
+round 2 ours 0012 off MTP2                 short   55.2  long   57.0  pp_long  398.5  acc 0.79  CPU 34.9%  GPU  73.3 W  20261108-152705_ms_Qwen3.8-Flas_ours_0012_off_MTP2_r2.jsonl
+round 2 ours 0012 MTP2                     short   55.6  long   56.8  pp_long  399.5  acc 0.79  CPU 35.0%  GPU  71.6 W  20261108-152903_ms_Qwen3.8-Flas_ours_0012_MTP2_r2.jsonl
+round 2 ours 0012 off nodraft              short   47.1  long   47.9  pp_long  453.5  acc 0.00  CPU 35.9%  GPU  83.5 W  20261108-153101_ms_Qwen3.8-Flas_ours_0012_off_nodraft_r2.jsonl
+round 2 ours 0012 nodraft                  short   49.2  long   49.2  pp_long  456.8  acc 0.00  CPU 35.8%  GPU  82.7 W  20261108-153258_ms_Qwen3.8-Flas_ours_0012_nodraft_r2.jsonl
+
+model: Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002.gguf
+| Contender | short, tok/s | long 17K, tok/s | prompt 17K, tok/s | draft accepted | CPU busy | GPU power | GPU J/token (short) | short/long per round |
+|---|---|---|---|---|---|---|---|---|
+| ours 0012 off MTP2 | 55.4 | 55.9 | 399 | 79% | 35% | 73 W | 1.31 | 55.4/54.9, 56.3/55.9, 55.2/57.0 |
+| ours 0012 MTP2 | 55.9 | 56.8 | 399 | 79% | 35% | 72 W | 1.29 | 56.3/57.1, 55.9/55.7, 55.6/56.8 |
+| ours 0012 off nodraft | 47.1 | 48.4 | 456 | nan% | 36% | 83 W | 1.77 | 47.0/48.4, 47.2/48.4, 47.1/47.9 |
+| ours 0012 nodraft | 49.2 | 49.2 | 457 | nan% | 36% | 83 W | 1.68 | 49.2/49.2, 49.2/49.3, 49.2/49.2 |
+
+raw: bench\milestone_results_q38_p0012.json
