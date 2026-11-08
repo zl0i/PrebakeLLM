@@ -1,0 +1,62 @@
+{
+ "llama.cpp default (-ngl 99)": [
+  {
+   "short": 173.696334692461,
+   "long": 159.43648269363874,
+   "pp_long": 13077.875823901597,
+   "acc": null,
+   "cpu_busy": 0.057125,
+   "gpu_w": 138.8125,
+   "log": "20261108-051626_ms_Qwen3.5-2B-M_llama_cpp_default___ngl_99__r0.jsonl"
+  },
+  {
+   "short": 168.85354019301386,
+   "long": 156.0640046023581,
+   "pp_long": 12944.878701720141,
+   "acc": null,
+   "cpu_busy": 0.05725,
+   "gpu_w": 130.3375,
+   "log": "20261108-051714_ms_Qwen3.5-2B-M_llama_cpp_default___ngl_99__r1.jsonl"
+  }
+ ],
+ "llama.cpp + MTP 2 (same as aic)": [
+  {
+   "short": 221.616533983382,
+   "long": 221.87090245772055,
+   "pp_long": 10014.164868787968,
+   "acc": 0.671838989306508,
+   "cpu_busy": 0.060375,
+   "gpu_w": 137.95,
+   "log": "20261108-051643_ms_Qwen3.5-2B-M_llama_cpp___MTP_2__same_as_aic__r0.jsonl"
+  },
+  {
+   "short": 215.66518424385907,
+   "long": 218.50057195737952,
+   "pp_long": 9977.520449055377,
+   "acc": 0.671838989306508,
+   "cpu_busy": 0.06025,
+   "gpu_w": 130.1625,
+   "log": "20261108-051732_ms_Qwen3.5-2B-M_llama_cpp___MTP_2__same_as_aic__r1.jsonl"
+  }
+ ],
+ "ours (aic build)": [
+  {
+   "short": 214.94151931108712,
+   "long": 215.37125781882128,
+   "pp_long": 9948.472520225523,
+   "acc": 0.671838989306508,
+   "cpu_busy": 0.060875,
+   "gpu_w": 132.275,
+   "log": "20261108-051658_ms_Qwen3.5-2B-M_ours__aic_build__r0.jsonl"
+  },
+  {
+   "short": 215.58382409219612,
+   "long": 216.6074181669916,
+   "pp_long": 9987.935445893097,
+   "acc": 0.671838989306508,
+   "cpu_busy": 0.061875,
+   "gpu_w": 133.3,
+   "log": "20261108-051747_ms_Qwen3.5-2B-M_ours__aic_build__r1.jsonl"
+  }
+ ]
+}

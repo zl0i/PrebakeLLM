@@ -1,0 +1,62 @@
+{
+ "llama.cpp best (cache8500 t6)": [
+  {
+   "short": 71.15026356334992,
+   "long": 56.83672213930747,
+   "pp_long": 780.3454885329046,
+   "acc": null,
+   "cpu_busy": 0.056,
+   "gpu_w": 114.9875,
+   "log": "20261108-035106_ms_GLM-4.7-Flas_llama_cpp_best__cache8500_t6__r0.jsonl"
+  },
+  {
+   "short": 63.90121921550926,
+   "long": 53.69592188949,
+   "pp_long": 625.502094889653,
+   "acc": null,
+   "cpu_busy": 0.055875,
+   "gpu_w": 75.7875,
+   "log": "20261108-040145_ms_GLM-4.7-Flas_llama_cpp_best__cache8500_t6__r1.jsonl"
+  }
+ ],
+ "ik_llama.cpp best (cache8500 t8)": [
+  {
+   "short": 55.96679151600303,
+   "long": 40.90176896955342,
+   "pp_long": 36.02186368858379,
+   "acc": null,
+   "cpu_busy": 0.0625,
+   "gpu_w": 72.6375,
+   "log": "20261108-035217_ms_GLM-4.7-Flas_ik_llama_cpp_best__cache8500_t8__r0.jsonl"
+  },
+  {
+   "short": 55.35158831920933,
+   "long": 40.467609551430776,
+   "pp_long": 35.85448269576847,
+   "acc": null,
+   "cpu_busy": 0.06575,
+   "gpu_w": 70.4625,
+   "log": "20261108-040259_ms_GLM-4.7-Flas_ik_llama_cpp_best__cache8500_t8__r1.jsonl"
+  }
+ ],
+ "ours (aic build)": [
+  {
+   "short": 86.72604243129496,
+   "long": 71.22895079755475,
+   "pp_long": 760.1341122701175,
+   "acc": null,
+   "cpu_busy": 0.28225,
+   "gpu_w": 122.0875,
+   "log": "20261108-040045_ms_GLM-4.7-Flas_ours__aic_build__r0.jsonl"
+  },
+  {
+   "short": 86.43697210582563,
+   "long": 71.66401884510763,
+   "pp_long": 760.4979852092717,
+   "acc": null,
+   "cpu_busy": 0.27949999999999997,
+   "gpu_w": 122.0875,
+   "log": "20261108-041129_ms_GLM-4.7-Flas_ours__aic_build__r1.jsonl"
+  }
+ ]
+}
