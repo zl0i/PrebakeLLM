@@ -1,0 +1,124 @@
+# Передача: состояние на 2026-11-08 (конец сессии)
+
+Для следующей сессии, которая начинает с чистого листа. Сначала прочитать `CLAUDE.md` (правила, окружение, команды), затем `DECISIONS.md` (D6 — устройство движка, D9 — ночь 2026-11-08, D10 — сравнение со Strata).
+
+## Где мы
+
+**Движок** — форк llama.cpp «moe-zc»: эксперты MoE в кэше VRAM, промахи параллельно считает CPU (`engine/patches/0001–0009`, ветка `engine` в `third_party/llama-fork`).
+
+**«Компилятор» `aic.py`** подбирает под машину и модель:
+- режим `moe-zc` / `gpu` / `fit`;
+- кэш экспертов;
+- драфт: MTP-голова встроенная или файлом, либо маленькая модель того же семейства;
+- число CPU-потоков.
+
+**Итоги по моделям** (подробно — D9, таблица; цифры — BENCHMARKS.md):
+
+| Модель | Наш движок против лучшего llama.cpp |
+|---|---|
+| Qwen3.6-35B-A3B, MTP-голова отдельным файлом | +15…29% |
+| Qwen3.6-35B-A3B, MTP внутри файла | вровень |
+| GLM-4.7-Flash | +28…31% |
+| Gemma 4 26B-A4B | +9…12% |
+| Qwen3.8-Flash-Next | −2…−4% |
+| маленькие Qwen3.5 (в VRAM) | равно llama.cpp (выигрыш только от выбора MTP, +7…58% к запуску по умолчанию) |
+
+Strata на Qwen3.8 быстрее в 1.8 раза (с приближением, см. ниже), на Qwen3.6 медленнее в 2.5 раза.
+
+## Воспроизведение замеров одной командой
+
+**Перед замерами:**
+- схема питания «Высокая производительность»;
+- закрыть фоновые программы, включая браузеры и Диспетчер задач (он опрашивает GPU);
+- ничего не качать и не распаковывать параллельно: антивирус на распаковке однажды подвесил замер;
+- сравнивать только участников внутри одного прогона.
+
+| Что | Команда | Время |
+|---|---|---|
+| Веха 1, Qwen3.6 UD-Q4_K_M, замороженный состав | `python bench/milestone.py --contenders bench/contenders/milestone1_Qwen3.6.json --rounds 3` | ~30 мин |
+| Qwen3.6 при свободной VRAM (llama.cpp с кэшем 7500) | `python bench/milestone.py --contenders bench/contenders/qwen_highperf.json --rounds 2` | ~20 мин |
+| Strata + llama.cpp + наш движок, Qwen3.8 | `python bench/strata_compare.py qwen38 --rounds 2` | ~25 мин |
+| то же, Strata без пропуска экспертов | `python bench/strata_compare.py qwen38 --rounds 2 --tail-skip 0` | ~25 мин |
+| то же, Qwen3.6 UD-Q4_K_XL с MTP внутри | `python bench/strata_compare.py qwen36 --rounds 2` | ~20 мин |
+| Любая другая модель: llama.cpp против нашего | `python bench/milestone.py --model <gguf> --rounds 2` (участники — `bench/contenders/<stem>.json`) | 10–30 мин |
+| Корректность (perplexity, KLD) | `MODEL=<gguf> ZC_MIB=5000 NCMOE=<половина слоёв> bash bench/quality.sh` | 10–30 мин |
+| Пересобрать профиль сборки | `python aic.py build --model <gguf>` | 1–16 мин |
+
+`bench/strata_compare.py` целиком прогнан только в режиме `--dry-run`. Все команды внутри него запускались по отдельности, их результаты — в BENCHMARKS.md.
+
+**Если сборок нет:**
+- движок: `tools\build_llamacpp.bat third_party\llama-fork build\llama-fork`; исходники — `git -C third_party/llama.cpp worktree add ../llama-fork -b engine 80d2c0c2c` и `git am engine/patches/*.patch`;
+- эталон llama.cpp: официальные бинарники b12189 в `third_party/llama-bin/`;
+- ik_llama.cpp: `tools/build_ik.bat` → `build/ik`.
+
+## Модели (`models/`, не в git)
+
+| Файл | ГиБ | Откуда | Драфт |
+|---|---|---|---|
+| `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` | 20.6 | unsloth | `mtp-Qwen3.6-35B-A3B-Q4_0.gguf` (ggml-org), `dflash-…` (не используется) |
+| `qwen36mtp/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf` | 21.3 | unsloth `Qwen3.6-35B-A3B-MTP-GGUF` | MTP внутри; этот файл нужен Strata |
+| `Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf` | 20.8 | unsloth, **без MTP** | — (Strata его не принимает; кандидат на удаление) |
+| `GLM-4.7-Flash-MTP-Q4_K_M.gguf` | 17.6 | meshllm | MTP внутри (ik_llama.cpp не грузит) |
+| `GLM-4.7-Flash-Q4_K_M.gguf` | 17.1 | unsloth | — |
+| `gemma-4-26B-A4B-it-UD-Q4_K_M.gguf` | 15.8 | unsloth | `mtp-gemma-4-26B-A4B-it.gguf` (gemma4-assistant) |
+| `qwen38/Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-0000{1,2}-of-00002.gguf` | 35.0 + 26.8 | ISTA-DASLab | `qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf` (unsloth `MTP/mtp-Qwen3.8-Flash-Next-Q4_K_M.gguf`, переименован, чтобы `aic` его нашёл) |
+| `qwen38/unused/…-shared-Q4_K_M.gguf` | 1.8 | unsloth | не грузится в нашу версию llama.cpp |
+| `Qwen3.5-{0.8B,2B}-MTP-Q8_0.gguf`, `Qwen3.5-{4B,9B}-MTP-Q4_K_M.gguf` | 0.8–5.5 | unsloth `*-MTP-GGUF` | MTP внутри |
+| `Qwen3.5-*-Q*.gguf` (без MTP) | 0.8–5.3 | unsloth | кандидаты в драфт-модели, проиграли |
+
+SHA256 сверены с HF при загрузке (BENCHMARKS.md, `bench/logs/qwen38_sha256.txt`). Свободно на D: около 239 ГБ.
+
+**Промпты** — `bench/prompts/<stem>.json` (и `.calib.json`), в шаблоне чата модели (`bench/make_model_prompts.py`).
+
+**Профили сборки** — `cache/<stem>__ba1f8207.json`, копии — в `bench/profiles/`.
+
+## Strata (не в git)
+
+| Что | Где |
+|---|---|
+| Скачанные архивы и SHA256SUMS | `third_party/strata/dl/` |
+| Движок 0.1.58, распакованный (для справки) | `third_party/strata/engine/` |
+| Терминальная версия (запуск: `third_party\strata\ctl2\bin\strata.cmd launch …`) | `third_party/strata/ctl2/` |
+| Её паки, MTP-слой для Qwen3.8 (5.2 ГБ), токенизаторы | `third_party/strata/data/` |
+| Её профиль экспертов | `third_party/strata/ctl2/data/expert-profile.bin` |
+| **Вне проекта:** движок, который она реально запускает (~930 МБ), конфигурации и журналы запуска | `%LOCALAPPDATA%\Strata\components\`, `…\launch\`, `…\install\`, `…\runtime\` |
+| Копии журналов движка и конфигураций (в git) | `bench/logs/strata/` |
+
+Strata останавливается командой `strata.cmd launch --stop`. Пока она запущена, GPU занят ею (порт 8091).
+
+## Известные проблемы
+
+1. **MTP внутри файла: мы только вровень с llama.cpp** (Qwen3.6 UD-Q4_K_XL). Гипотезы и исправление — D10. Выигрыш вехи 1 держится на отдельном файле MTP-головы.
+2. **Qwen3.8: мы на 2–4% медленнее llama.cpp.** MTP-голова с 512 экспертами занимает 2.6 ГБ VRAM, а её экспертов на CPU мешает считать конкуренция потоков (D10).
+3. **Профили, собранные до патчей 0007–0009, устарели** (Qwen3.6 UD-Q4_K_M, GLM, маленькие модели — по хэшу патчей). `aic run` предупреждает «engine changed». Вывод моделей от патчей не изменился (проверено побитово), но перед замерами лучше пересобрать.
+4. **Профиль ищется по имени файла.** У двух файлов `Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf` (без MTP и в `qwen36mtp/`) он общий. Сейчас в `cache/` профиль файла с MTP; на файле без MTP `aic run` откажет («model file changed»).
+5. **Длина драфта в режиме `moe-zc` не больше 3**: гибридный путь берёт до 4 токенов (`ZC_MAX_TOKENS`). Длиннее — скорость падает в 10 раз; сборка это учитывает.
+6. **Драфт отдельной моделью (`draft-simple`) в этой версии llama.cpp медленный** (Qwen3.5-0.8B к 2B: 86 против 172 ток/с без драфта). Сборка его пробует и отбрасывает.
+7. **Gemma 4 на сыром wikitext даёт perplexity ~22 000** даже в официальном llama.cpp: это instruct-модель. KLD по wikitext для неё малоинформативен, корректность проверена ещё сравнением жадных ответов.
+8. **Шумы машины.** Монитор на этой же карте (Windows занимает 0.7–2.5 ГБ VRAM, это плавает). Без схемы «Высокая производительность» и с браузерами всё медленнее примерно на 8%.
+
+## Незаконченные эксперименты (по пользе)
+
+1. **Strata без пропуска экспертов:** `python bench/strata_compare.py qwen38 --tail-skip 0`. Покажет, сколько её преимущества на Qwen3.8 — приближение, а сколько — движок.
+2. **MTP-слой внутри файла в VRAM** (D10, гипотеза А):
+   - патч движка: обслуживать только слои с экспертами в RAM;
+   - `aic`: добавить `-ot "blk\.<N>\.ffn_.*_exps=CUDA0"` для MTP-слоя;
+   - перемерить Qwen3.6 UD-Q4_K_XL MTP.
+
+   Перед этим разделить гипотезы А и Б замером на `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` UD-Q4_K_M (21.1 ГиБ, не скачан).
+3. **Профиль nsys на Qwen3.8** (CLAUDE.md, «Профиль шага генерации»): проверить, что основное время — GPU-часть.
+4. **Эксперты MTP-головы Qwen3.8 через наш гибридный путь**, а не в VRAM целиком и не через CPU-потоки llama.cpp.
+5. **Strata на Qwen3.6 в лучшей настройке:** `--tune quick`, потоки только на P-ядрах (`--pool-cores 0,2,4,6,8,10,12,14`). Сейчас замерена рекомендуемая установка с `--tune skip`.
+6. **Обработка промпта** (Strata в 3–9 раз быстрее):
+   - сборка не подбирает `-ub`/`-b`;
+   - у нас эксперты копируются в VRAM на каждый батч из 512 токенов.
+7. **Цель сборки — параметр.** MTP замедляет обработку промпта на 20–33% (маленькие модели), а сейчас оптимизируется только генерация.
+8. **ktransformers** отложен до сервера с двумя RTX 3090 (решение владельца).
+
+## Решения, которых ждём от владельца
+
+- Удалить ненужные файлы (~33 ГБ):
+  - `models/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf` (без MTP, 20.8 ГБ);
+  - `models/qwen38/unused/` (1.8 ГБ);
+  - Qwen3.5 без MTP (~10 ГБ).
+- Делать ли п. 2 из списка экспериментов первым.

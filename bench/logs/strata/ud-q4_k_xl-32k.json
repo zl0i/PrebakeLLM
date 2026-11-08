@@ -1,0 +1,45 @@
+{
+ "exe": "component:strata-engine",
+ "args": [
+  "--native",
+  "D:\\Projects\\Work\\ai\\models\\qwen36mtp\\Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+  "--max-context",
+  "32768",
+  "--prefill",
+  "auto",
+  "--mtp",
+  "2"
+ ],
+ "cwd": "D:\\Projects\\Work\\ai\\third_party\\strata\\ctl2",
+ "tokenizer": "D:\\Projects\\Work\\ai\\third_party\\strata\\data\\packs\\qwen36-ud-q4_k_xl\\tokenizer",
+ "model_name": "qwen3.6-35b-a3b-ud-q4_k_xl",
+ "arch": "qwen35moe",
+ "log": "C:\\Users\\Dmitri\\AppData\\Local\\Strata\\launch\\ud-q4_k_xl-32k.engine.log",
+ "lib_dirs": [],
+ "port": 8091,
+ "gpu": 0,
+ "gpus_asked": true,
+ "args_written": [
+  "--native",
+  "D:\\Projects\\Work\\ai\\models\\qwen36mtp\\Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+  "--max-context",
+  "32768",
+  "--prefill",
+  "auto",
+  "--mtp",
+  "2"
+ ],
+ "host": "127.0.0.1",
+ "drafting": "mtp",
+ "open_browser": false,
+ "args_derived": [
+  "--native",
+  "D:\\Projects\\Work\\ai\\models\\qwen36mtp\\Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+  "--max-context",
+  "32768",
+  "--prefill",
+  "auto",
+  "--mtp",
+  "2"
+ ]
+}

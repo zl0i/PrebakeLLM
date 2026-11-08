@@ -737,3 +737,70 @@ Strata принимает Qwen3.6 только в пакетах unsloth со **
 **Выводы:**
 - **Strata на Qwen3.6 в 2.5 раза медленнее** и нас, и llama.cpp: эксперты почти не кэшируются в VRAM, драфт не работает. Её поддержка Qwen3.6 явно второстепенна по сравнению с Qwen3.8. Обработка промпта у неё при этом в 2.7–3.4 раза быстрее.
 - **Со встроенным MTP-слоем наш движок идёт вровень с llama.cpp**, хотя с отдельным файлом MTP-головы (Q4_K_M, веха 1) мы на 15–29% быстрее. Причина: встроенный MTP-слой — это слой модели, `-cmoe` отправляет его экспертов в RAM, и каждый шаг драфта ждёт CPU. Отдельная голова лежит в VRAM целиком. llama.cpp этот слой тоже считает на CPU (CPU занят на 34% против обычных 6%), поэтому он и не отстаёт. Исправление — держать экспертов MTP-слоя в VRAM. Это следующий шаг (DECISIONS D9).
+
+
+## Сравнение со Strata: сводка, команды, логи (2026-11-08)
+
+Отчёт для чтения — `bench/strata_comparison.md`. Одна команда на модель — `python bench/strata_compare.py qwen38|qwen36 [--tail-skip 0]` (HANDOFF.md). Ниже — что именно запускалось.
+
+**Strata 0.2.12 (движок 0.1.58).** Терминальная сборка — `third_party/strata/ctl2`, данные (паки, её MTP-слой) — `third_party/strata/data`, движок скопирован в `%LOCALAPPDATA%\Strata\components\`.
+
+Qwen3.8:
+```
+third_party\strata\ctl2\bin\strata.cmd launch --family qwen --model q2_0 --model-path D:\Projects\Work\ai\models\qwen38 ^
+  --data-dir D:\Projects\Work\ai\third_party\strata\data --context 32k --vision off --drafting mtp --tune skip ^
+  --port 8091 --no-api-key --no-tui --yes
+python bench/strata_bench.py --model models/qwen38/Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002.gguf --tag strata_q38 --rounds 2
+third_party\strata\ctl2\bin\strata.cmd launch --stop
+```
+
+Итоговая строка запуска движка (`bench/logs/strata/q2_0-32k.json`):
+`strata.exe --serve --pack ...\data\packs\q2_0 --native <shard1> --ple-gguf <shard2> --expert-profile ...\ctl2\data\expert-profile.bin --expert-cache auto --prefill auto --spec 4 --spec-min-p 0.5 --mtp ...\data\mtp\rt --max-context 32768 --kv int8`
+
+Qwen3.6:
+```
+third_party\strata\ctl2\bin\strata.cmd launch --family qwen36 --model ud-q4_k_xl ^
+  --model-path D:\Projects\Work\ai\models\qwen36mtp\Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf ^
+  --data-dir D:\Projects\Work\ai\third_party\strata\data --context 32k --vision off --tune skip --port 8091 --no-api-key --no-tui --yes
+python bench/strata_bench.py --model models/qwen36mtp/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf --tag strata_q36 --rounds 2
+```
+
+Повтор с `--parallel 1 --drafting mtp --restart` дал то же. Строка запуска движка: `strata.exe --serve --native <file> --max-context 32768 --prefill auto --mtp 2`.
+
+**llama.cpp и наш движок** — `python bench/milestone.py --model <файл> --rounds 2`. Участники llama.cpp — `bench/contenders/<stem>.json`, наш движок — сохранённая сборка `cache/<stem>__ba1f8207.json` (копия в `bench/profiles/`).
+
+Qwen3.8, лучший llama.cpp (официальная b12189):
+`llama-server -m <shard1> -c 20480 -np 1 -ngl 99 -cmoe --moe-cache-mib 5500 -lm none -t 8 -md models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf -cmoed --spec-type draft-mtp --spec-draft-n-max 3`
+
+Qwen3.8, наш движок (`aic run`):
+`LLAMA_MOE_ZC_MIB=3180 LLAMA_MOE_ZC_THREADS=8 build/llama-fork/bin/llama-server -m <shard1> -c 20480 -np 1 -ngl 99 -cmoe -lm none -t 1 -md models/qwen38/mtp-Qwen3.8-Flash-Next-GSQ-RCO-Q4_K_M.gguf --spec-type draft-mtp --spec-draft-n-max 2`
+
+Qwen3.6 XL, llama.cpp:
+`llama-server -m models/qwen36mtp/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf -c 20480 -np 1 -ngl 99 -cmoe --moe-cache-mib 7500 -lm none -t 8 --spec-type draft-mtp --spec-draft-n-max 2|3`
+
+Qwen3.6 XL, наш движок:
+`LLAMA_MOE_ZC_MIB=7175 LLAMA_MOE_ZC_THREADS=6 build/llama-fork/bin/llama-server -m <тот же файл> -c 20480 -np 1 -ngl 99 -cmoe -lm none -t 1 --spec-type draft-mtp --spec-draft-n-max 2`
+
+**Сырые логи.** Один JSON на запрос: скорость, драфт, текст ответа.
+
+Strata:
+- `bench/logs/20261108-091652_strata_q38.jsonl`
+- `bench/logs/20261108-105519_strata_q36.jsonl`
+- `bench/logs/20261108-105848_strata_q36_p1.jsonl`
+
+Журналы движка Strata и конфигурации запуска (копии из `%LOCALAPPDATA%\Strata\launch\`) — `bench/logs/strata/`: `q2_0-32k.engine.log`, `ud-q4_k_xl-32k.engine.log`, `*.json`, `*.setup.log`. Вывод `strata launch` — `bench/logs/strata_launch*.txt`.
+
+llama.cpp и наш движок, Qwen3.8 — `bench/logs/20261108-09{3652,3928,4148,4353,4625,4845}_ms_Qwen3.8-Flas_*.jsonl`. Сводка — `bench/milestone_results_Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002.json`, `bench/logs/milestone_qwen38.txt`.
+
+llama.cpp и наш движок, Qwen3.6 XL — `bench/logs/20261108-11{0638,0744,0850,0952,1058,1204}_ms_Qwen3.6-35B-_*.jsonl`. Сводка — `bench/milestone_results_Qwen3.6-35B-A3B-UD-Q4_K_XL.json`, `bench/logs/milestone_qwen36xl.txt`.
+
+**Итог** (ток/с, short / long 17K, median двух кругов):
+
+| | Strata | llama.cpp | наш движок |
+|---|---|---|---|
+| Qwen3.8 Q2_0 | 85.8 / 93.4 | 49.0 / 50.4 | 46.8 / 49.4 |
+| Qwen3.6 UD-Q4_K_XL (MTP внутри) | 37.2 / 30.7 | 92.2 / 98.5 | 90.9 / 96.3 |
+
+У Strata на Qwen3.8 по умолчанию пропускаются промахнувшиеся эксперты 7-го места и ниже (`STRATA_ROUTE_TAIL_SKIP=7`, 374 тысячи пропусков за прогон). Это приближение, оно меняет вывод модели. Повтор без него — `--tail-skip 0` — не сделан.
+
+Доля принятых токенов драфта здесь посчитана по сумме за все запросы. В таблицах milestone выше это среднее по промптам, поэтому там у нашего движка на Qwen3.8 78%, а здесь 76%.

@@ -1,0 +1,26 @@
+Strata - Qwen3.6-35B-A3B on a normal PC (a GPU + system RAM + CPU)
+=== Step 1: checking your PC ===
+  [ok] GPU: NVIDIA GeForce RTX 4070 SUPER, 12.0 GB VRAM, compute capability 8.9, driver 621.01
+  [ok] RAM: 64 GB
+  [ok] CPU: 13th Gen Intel(R) Core(TM) i7-13700KF (AVX2)
+  [ok] PCIe: 4.0 x16
+=== Step 2: your choices ===
+  Qwen3.6-35B-A3B - Qwen; GGUFs with the MTP layer by Unsloth: 35B mixture of experts with 3B active (256 experts, top-8): a smaller cousin of Qwen3.8-Flash-Next with the same tokenizer
+  [ok] model: Qwen3.6-35B-A3B
+  Its license: Apache 2.0: https://huggingface.co/Qwen/Qwen3.6-35B-A3B
+  1) UD-Q4_K_XL 4-bit (Unsloth Dynamic), the smallest; download 22.9 GB
+  2) UD-Q6_K_XL 6-bit (Unsloth Dynamic), closer to the full model; download 32.6 GB
+  3) Q8_0       8-bit, the closest to the full model; download 37.8 GB
+  [ok] size: UD-Q4_K_XL
+  [ok] context: 32768 tokens
+  [ok] images: off
+=== Step 3: Python packages ===
+  [ok] numpy, jinja2, regex, pyyaml, tqdm, requests, cmake, ninja, pillow, psutil, textual (the screens): bundled with the app
+=== Step 4: the Strata engine ===
+  [ok] llama.cpp 3cf0325 (gguf-py for the preparation tools)
+  [ok] engine component: 0.1.58 (windows-x86_64-cuda) in C:\Users\Dmitri\AppData\Local\Strata\components\engine\0.1.58-windows-x86_64-cuda-cuda13
+  [ok] engine: the engine component (looked up when the model loads)
+=== Step 5: downloading Qwen3.6-35B-A3B UD-Q4_K_XL ===
+  [X]  D:\Projects\Work\ai\models\Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf is missing
+       put Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf in D:\Projects\Work\ai\models, or drop --gguf-dir to download it
+Setup stopped. Fix the item above and run it again - everything already done is kept and skipped.
