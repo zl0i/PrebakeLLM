@@ -202,6 +202,57 @@ def start_server(cmd, log_file) -> subprocess.Popen:
                             creationflags=subprocess.CREATE_NEW_CONSOLE, startupinfo=si)
 
 
+def dump_hung_server(proc: subprocess.Popen, out_prefix: str) -> list:
+    """A server that stopped answering (DECISIONS D11: rare hang): writes a minidump with the stacks of all
+    threads of every non-Python process under `proc` (the server sits under the Ctrl-C wrapper) to
+    <out_prefix>_<pid>.dmp. No memory contents (the pinned experts alone are ~32 GB). Open in WinDbg or
+    Visual Studio; without PDBs (Release build) the stacks show exported symbols and offsets only.
+    The engine's own watchdog (LLAMA_MOE_ZC_WATCHDOG_S) prints its thread states into the server log."""
+    if sys.platform != "win32" or proc.poll() is not None:
+        return []
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.windll.kernel32
+
+    class PE32(ctypes.Structure):
+        _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD), ("th32ProcessID", wintypes.DWORD),
+                    ("th32DefaultHeapID", ctypes.c_void_p), ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
+                    ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", ctypes.c_long), ("dwFlags", wintypes.DWORD),
+                    ("szExeFile", ctypes.c_wchar * 260)]
+    k32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    snap = k32.CreateToolhelp32Snapshot(0x2, 0)  # TH32CS_SNAPPROCESS
+    procs, e = [], PE32()
+    e.dwSize = ctypes.sizeof(PE32)
+    ok = k32.Process32FirstW(snap, ctypes.byref(e))
+    while ok:
+        procs.append((e.th32ProcessID, e.th32ParentProcessID, e.szExeFile))
+        ok = k32.Process32NextW(snap, ctypes.byref(e))
+    k32.CloseHandle(snap)
+    todo, found = [proc.pid], []
+    while todo:
+        p = todo.pop()
+        for pid, ppid, exe in procs:
+            if ppid == p:
+                todo.append(pid)
+                if not exe.lower().startswith(("python", "conhost")):
+                    found.append((pid, exe))
+    dbghelp = ctypes.windll.dbghelp
+    k32.OpenProcess.restype = wintypes.HANDLE
+    k32.CreateFileW.restype = wintypes.HANDLE
+    written = []
+    for pid, exe in found:
+        path = f"{out_prefix}_{pid}.dmp"
+        hp = k32.OpenProcess(0x0400 | 0x0010, False, pid)  # PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
+        hf = k32.CreateFileW(path, 0x40000000, 0, None, 2, 0x80, None)  # GENERIC_WRITE, CREATE_ALWAYS
+        # MiniDumpNormal (thread stacks) | WithHandleData | WithUnloadedModules | WithProcessThreadData | WithThreadInfo
+        flags = 0x0 | 0x4 | 0x20 | 0x100 | 0x1000
+        if hp and hf and hf != wintypes.HANDLE(-1).value and dbghelp.MiniDumpWriteDump(hp, pid, hf, flags, None, None, None):
+            written.append(path)
+        if hf: k32.CloseHandle(hf)
+        if hp: k32.CloseHandle(hp)
+    return written
+
+
 def stop_server(proc: subprocess.Popen) -> None:
     if proc.poll() is not None:
         return

@@ -27,6 +27,7 @@ import json
 import os
 import pathlib
 import platform
+import shutil
 import statistics
 import subprocess
 import sys
@@ -216,6 +217,7 @@ def measure(model: pathlib.Path, cfg: dict, prompts: list, n_predict: int = 160,
         os.environ.clear()
         os.environ.update(env_backup)
     base = f"http://127.0.0.1:{port}"
+    hang_log = None
     try:
         sb.wait_ready(base, proc)
         load_s = time.time() - t0
@@ -232,10 +234,20 @@ def measure(model: pathlib.Path, cfg: dict, prompts: list, n_predict: int = 160,
         return {"tg": statistics.median(tg), "tg_all": tg, "vram_free_before": free0, "vram_free_loaded": free1,
                 "load_s": round(load_s, 1), "ok": True}
     except Exception as e:  # out of memory, crash...
-        return {"ok": False, "error": str(e)}
+        res = {"ok": False, "error": str(e)}
+        timed_out = isinstance(e, TimeoutError) or "timed out" in str(e).lower()
+        if timed_out and proc.poll() is None:  # alive but not answering: keep what is needed to analyse the hang
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            res["dumps"] = sb.dump_hung_server(proc, str(ROOT / "bench" / "logs" / f"aic_hang_{stamp}"))
+            hang_log = res["hang_log"] = f"bench/logs/aic_hang_{stamp}.server.log"
+            print(f"  probe failed with the server alive (hang?): log {hang_log}, dumps {res['dumps']}")
+        return res
     finally:
         sb.stop_server(proc)
         log.close()
+        # the log is overwritten by the next probe: keep a copy of a hung one
+        if hang_log:
+            shutil.copyfile(ROOT / "bench" / "logs" / "aic_build.server.log", ROOT / hang_log)
 
 
 # ---------------------------------------------------------------- commands

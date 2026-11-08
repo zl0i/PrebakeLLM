@@ -102,6 +102,7 @@ python tools/cachesim.py <eval.bin> [--calib <calib.bin>] [--mib 5500 6500 7500]
 
   Код — `ggml/src/ggml-cuda/moe-zc.cu` (менеджер, почта GPU↔CPU, CPU-потоки), хуки в `mmvq.cu` и `mmq.cu`, `src/llama-moe-zc.cpp`.
 - **Патч 0010** (D11): адаптивный лимит подвоза экспертов за шаг, `LLAMA_MOE_ZC_MAX_UPLOADS` (по умолчанию 1024). Статистика движка — `LLAMA_MOE_ZC_VERBOSE=1`; у llama-server она видна только с `-lv 4`.
+- **Патч 0013** (D11a): сторож движка. Если запрос к CPU ждёт больше 1 с, рабочие потоки переходят на мягкую привязку (`hang guard` в журнале). Через `LLAMA_MOE_ZC_WATCHDOG_S` (30 с) печатается состояние потоков. `LLAMA_MOE_ZC_SOFT_PIN=1` включает мягкую привязку с первого запуска, `LLAMA_MOE_ZC_TEST_STALL_S` — тест. Профиль шага с драфтом — nsys прямо на `llama-server.exe` (через обёртку `serverbench` nsys сервер не видит) и `tools/windowsplit.py`.
 - **Время по часам клиента:** `--stream` у `serverbench.py`, `milestone.py`, `strata_bench.py`, `strata_compare.py`. Время шага — `bench/step_times.py`. Профиль любого движка с CUDA-графами (в т.ч. Strata) — `tools/graphsplit.py <sqlite>`.
 - **Компилятор:** `python aic.py build|run|show --model <gguf>`, профили — в `cache/`, копии — в `bench/profiles/`.
   - Режимы: `moe-zc`, `gpu`, `fit`.

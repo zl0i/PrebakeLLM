@@ -1,0 +1,351 @@
+From d62fa586d2dfe9bee243e3a7f57c9721dc0d199a Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@fusionpos.local>
+Date: Sun, 8 Nov 2026 23:58:28 +0300
+Subject: [PATCH] moe-zc: hang guard and watchdog; fix a start-up race of the
+ CPU helper threads
+
+Hang (DECISIONS D11a): the workers are pinned to one logical processor each and spin in a barrier at THREAD_PRIORITY_HIGHEST. The main thread, spinning in the CUDA driver while it waits for the GPU, was seen at dynamic priority 21; on a worker's processor it starved that worker forever (the others wait in the barrier, the GPU for the CPU, the main thread for the GPU). A watchdog thread checks the mailboxes once per second: a request waiting more than 1 s switches all workers to soft affinity (any logical processor of the P-cores, own core as ideal processor) once and logs 'hang guard'. Pinning stays hard by default (soft from the start: -2.4% on Qwen3.8); LLAMA_MOE_ZC_SOFT_PIN=1 makes it soft from the start.
+
+After LLAMA_MOE_ZC_WATCHDOG_S seconds (default 30, 0 = off, also disables the guard) the watchdog prints the state of the mailboxes, the leader, every worker (job generation, phase / barrier; one cache line per worker), the uploader and the main thread to stderr. LLAMA_MOE_ZC_TEST_STALL_S=N makes helper 1 sleep N s before CPU job 200 (test).
+
+Start-up race: a helper took job_gen as read when it started as its baseline; a helper that started after the first job was issued waited for the next generation and the leader for it in the barrier forever. The workers exist before any request, so the baseline is 0.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ ggml/src/ggml-cuda/moe-zc.cu | 184 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 171 insertions(+), 13 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/moe-zc.cu b/ggml/src/ggml-cuda/moe-zc.cu
+index 129dcceb6..85691f580 100644
+--- a/ggml/src/ggml-cuda/moe-zc.cu
++++ b/ggml/src/ggml-cuda/moe-zc.cu
+@@ -40,6 +40,7 @@
+ #include <cstdlib>
+ #include <chrono>
+ #include <condition_variable>
++#include <memory>
+ #include <mutex>
+ #include <thread>
+ #include <unordered_map>
+@@ -228,6 +229,23 @@ struct ggml_cuda_moe_zc {
+     std::vector<int> pf_n;               // per layer: tokens in h_pf_ids (set when the copy is enqueued)
+     std::vector<int32_t>  step_ids;      // scratch: ids[token][layer][k] of the current step
+ 
++    // watchdog (DECISIONS D11: a rare hang with the GPU spinning in k_zc_recv): when a mailbox request or
++    // observe() makes no progress for watchdog_s seconds, the state of all threads is printed to stderr
++    int watchdog_s = 30;               // LLAMA_MOE_ZC_WATCHDOG_S, 0 = off
++    std::thread watchdog;
++    std::mutex wd_mutex;
++    std::condition_variable wd_cv;
++    std::unique_ptr<std::atomic<uint32_t>[]> leader_seen;  // per layer: last request the leader took
++    std::atomic<int> leader_state{0};  // 0 scanning, 1 collecting misses, 2 in a CPU job, 3 job done
++    std::atomic<int> leader_layer{-1};
++    // per worker, one cache line each (written by its worker only; shared lines would bounce between the cores):
++    // gen = job generation it works on / last took; phase = 0 idle, 1-3 job phase, 11-13 waits in barrier 1-3
++    struct alignas(64) zc_thr_state { std::atomic<uint32_t> gen{0}; std::atomic<int> phase{0}; };
++    std::unique_ptr<zc_thr_state[]> thr;
++    std::atomic<int> main_state{0};    // observe(): 0 outside, 1 waits for the uploader, 2 waits for the copies, 3 bookkeeping
++    std::atomic<int64_t> main_since_ns{0};
++    bool soft_affinity = false;        // the hang guard switched the workers to soft affinity
++
+     // statistics
+     int64_t st_hits = 0, st_misses = 0, st_uploads = 0, st_evictions = 0, st_steps = 0, st_tokens = 0, st_no_slot = 0;
+     std::atomic<int64_t> st_cpu_jobs{0}, st_cpu_experts{0}, st_cpu_ns{0};
+@@ -277,7 +295,8 @@ static bool zc_evict_one(ggml_cuda_moe_zc * m) {
+ 
+ // ------------------------------------------------------------------ CPU workers
+ 
+-static void zc_barrier(ggml_cuda_moe_zc * m) {
++static void zc_barrier(ggml_cuda_moe_zc * m, int ith, int idx) {
++    m->thr[ith].phase.store(10 + idx, std::memory_order_relaxed);
+     const uint32_t gen = m->barrier_gen.load(std::memory_order_acquire);
+     if (m->barrier_count.fetch_add(1, std::memory_order_acq_rel) + 1 == (uint32_t) m->n_threads) {
+         m->barrier_count.store(0, std::memory_order_relaxed);
+@@ -313,6 +332,7 @@ static void zc_job_part(ggml_cuda_moe_zc * m, int ith) {
+     const int act = m->act;
+ 
+     // phase 1: gate and up rows of all CPU experts -> h = act(gate) * up
++    m->thr[ith].phase.store(1, std::memory_order_relaxed);
+     {
+         const int total = nm * n_ff;
+         const int per = (total + nth - 1) / nth;
+@@ -340,13 +360,15 @@ static void zc_job_part(ggml_cuda_moe_zc * m, int ith) {
+             m->h[(size_t) mi * n_ff + row] = a * u;
+         }
+     }
+-    zc_barrier(m);
++    zc_barrier(m, ith, 1);
+     // phase 2: quantize h of each expert for the down projection
++    m->thr[ith].phase.store(2, std::memory_order_relaxed);
+     for (int mi = ith; mi < nm; mi += nth) {
+         m->job_tr_h->from_float(m->h.data() + (size_t) mi * n_ff, m->hq.data() + (size_t) mi * m->hq_row, n_ff);
+     }
+-    zc_barrier(m);
++    zc_barrier(m, ith, 2);
+     // phase 3: down rows -> mailbox out[t][k][:]
++    m->thr[ith].phase.store(3, std::memory_order_relaxed);
+     {
+         const int total = nm * n_embd;
+         const int per = (total + nth - 1) / nth;
+@@ -361,14 +383,17 @@ static void zc_job_part(ggml_cuda_moe_zc * m, int ith) {
+             out[((size_t) ms.t * m->n_used + ms.k) * n_embd + row] = v;
+         }
+     }
+-    zc_barrier(m);
++    zc_barrier(m, ith, 3);
++    m->thr[ith].phase.store(0, std::memory_order_relaxed);
+ }
+ 
+-static void zc_pin_thread(int ith) {
+ #ifdef _WIN32
+-    // one thread per P-core (Intel hybrid: P-cores have the highest EfficiencyClass)
+-    static std::vector<DWORD_PTR> pmask = [] {
+-        std::vector<DWORD_PTR> res;
++// P-cores (Intel hybrid: the highest EfficiencyClass): the first logical processor of each, and all of their
++// logical processors
++struct zc_pcores { std::vector<DWORD_PTR> own; DWORD_PTR all = 0; };
++static const zc_pcores & zc_get_pcores() {
++    static const zc_pcores pc = [] {
++        zc_pcores res;
+         DWORD len = 0;
+         GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
+         std::vector<char> buf(len);
+@@ -380,14 +405,38 @@ static void zc_pin_thread(int ith) {
+             auto * r = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX) p;
+             if (r->Processor.EfficiencyClass == maxe) {
+                 KAFFINITY mk = r->Processor.GroupMask[0].Mask;
+-                res.push_back(mk & (~mk + 1));
++                res.own.push_back(mk & (~mk + 1));
++                res.all |= mk;
+             }
+         }
+         return res;
+     }();
+-    if (!pmask.empty()) {
+-        SetThreadAffinityMask(GetCurrentThread(), pmask[ith % pmask.size()]);
++    return pc;
++}
++
++// hard: worker ith on the first logical processor of P-core ith only (one worker per core, the fastest:
++// -2.4% for soft on Qwen3.8, BENCHMARKS 2026-11-09). soft: any logical processor of the P-cores, its own
++// core as the ideal processor.
++static void zc_set_affinity(HANDLE h, int ith, bool soft) {
++    const zc_pcores & pc = zc_get_pcores();
++    if (pc.own.empty()) return;
++    const DWORD_PTR own = pc.own[ith % pc.own.size()];
++    if (!soft || !pc.all) {
++        SetThreadAffinityMask(h, own);
++        return;
+     }
++    SetThreadAffinityMask(h, pc.all);
++    DWORD idx = 0;
++    while (!((own >> idx) & 1)) ++idx;
++    SetThreadIdealProcessor(h, idx);
++}
++#endif
++
++static void zc_pin_thread(int ith) {
++#ifdef _WIN32
++    // LLAMA_MOE_ZC_SOFT_PIN=1: soft affinity from the start (otherwise only after a hang, see zc_watchdog)
++    static const bool soft = getenv("LLAMA_MOE_ZC_SOFT_PIN") && atoi(getenv("LLAMA_MOE_ZC_SOFT_PIN")) != 0;
++    zc_set_affinity(GetCurrentThread(), ith, soft);
+     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+ #else
+     GGML_UNUSED(ith);
+@@ -429,6 +478,9 @@ static void zc_worker(ggml_cuda_moe_zc * m, int ith) {
+                 if (req == seen[il]) continue;
+                 any = true;
+                 seen[il] = req;
++                m->leader_seen[il].store(req, std::memory_order_relaxed);
++                m->leader_layer.store(il, std::memory_order_relaxed);
++                m->leader_state.store(1, std::memory_order_relaxed);
+                 m->last_work_ns.store(zc_now_ns(), std::memory_order_relaxed);
+                 std::atomic_thread_fence(std::memory_order_acquire);
+                 // collect the experts this step must compute on the CPU
+@@ -462,21 +514,31 @@ static void zc_worker(ggml_cuda_moe_zc * m, int ith) {
+                     m->st_cpu_jobs++;
+                     m->st_cpu_experts += (int64_t) m->job_miss.size();
+                     const auto t0 = std::chrono::steady_clock::now();
+-                    m->job_gen.fetch_add(1, std::memory_order_release); // wake helpers
++                    m->leader_state.store(2, std::memory_order_relaxed);
++                    m->thr[0].gen.store(m->job_gen.fetch_add(1, std::memory_order_release) + 1, std::memory_order_relaxed); // wake helpers
+                     zc_job_part(m, 0);
+                     m->st_cpu_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - t0).count();
+                 }
+                 std::atomic_thread_fence(std::memory_order_release);
+                 b->done = req;
++                m->leader_state.store(3, std::memory_order_relaxed);
+             }
+             if (!any) zc_idle_wait(m, spins);
+         }
+     } else {
+-        uint32_t gen = m->job_gen.load();
++        // The first job is generation 1. Taking job_gen as read here as the baseline (as before) raced with the
++        // leader: a helper that started late (slow, loaded machine) after the first job was issued waited for
++        // the next generation, and the leader waited for it in the barrier forever, the GPU in k_zc_recv.
++        // The workers are created before any request can arrive, so the baseline is 0.
++        uint32_t gen = 0;
+         while (!m->stop.load(std::memory_order_relaxed)) {
+             const uint32_t g = m->job_gen.load(std::memory_order_acquire);
+             if (g == gen) { zc_idle_wait(m, spins); continue; }
+             gen = g;
++            m->thr[ith].gen.store(g, std::memory_order_relaxed);
++            // test of the watchdog: LLAMA_MOE_ZC_TEST_STALL_S=N makes helper 1 sleep N s once, before CPU job 200
++            static const int test_stall_s = getenv("LLAMA_MOE_ZC_TEST_STALL_S") ? atoi(getenv("LLAMA_MOE_ZC_TEST_STALL_S")) : 0;
++            if (test_stall_s > 0 && ith == 1 && g == 200) std::this_thread::sleep_for(std::chrono::seconds(test_stall_s));
+             zc_job_part(m, ith);
+         }
+     }
+@@ -528,6 +590,89 @@ static void zc_uploader(ggml_cuda_moe_zc * m) {
+     }
+ }
+ 
++// ------------------------------------------------------------------ watchdog
++
++static void zc_dump_state(ggml_cuda_moe_zc * m, const char * why, double stalled_s) {
++    fprintf(stderr, "moe_zc WATCHDOG: %s, no progress for %.1f s (step %lld, steps %lld, tokens %lld)\n",
++        why, stalled_s, (long long) m->step, (long long) m->st_steps, (long long) m->st_tokens);
++    int n_pending = 0;
++    for (int il = 0; il < m->n_layer; ++il) {
++        const zc_mailbox * b = m->mb(il);
++        const uint32_t req = b->req, done = b->done;
++        if (req != done) {
++            fprintf(stderr, "  layer %2d: request %u (n_tokens %u) done %u, leader took %u\n",
++                il, req, b->n_tokens, done, m->leader_seen[il].load(std::memory_order_relaxed));
++            n_pending++;
++        }
++    }
++    if (n_pending == 0) fprintf(stderr, "  no mailbox request pending (layer 0: request %u done %u)\n", m->mb(0)->req, m->mb(0)->done);
++    fprintf(stderr, "  leader: state %d (0 scan, 1 collect, 2 CPU job, 3 job done) layer %d | job_gen %u job_layer %d job_miss %zu | barrier count %u gen %u\n",
++        m->leader_state.load(), m->leader_layer.load(), m->job_gen.load(), m->job_layer, m->job_miss.size(),
++        m->barrier_count.load(), m->barrier_gen.load());
++    fprintf(stderr, "  workers (gen/phase; phase 0 idle, 1-3 job phase, 11-13 in barrier 1-3):");
++    for (int i = 0; i < m->n_threads; ++i) fprintf(stderr, " [%d] %u/%d", i, m->thr[i].gen.load(), m->thr[i].phase.load());
++    fprintf(stderr, "\n");
++    // the uploader's fields are guarded by up_mutex; do not block on it (the main thread may hold it while waiting)
++    bool locked = false;
++    for (int i = 0; i < 100 && !(locked = m->up_mutex.try_lock()); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
++    fprintf(stderr, "  uploader: %s busy %d has_work %d go %d list %zu | copy_pending %d | upload budget %d of %d\n",
++        locked ? "" : "(up_mutex held, values unlocked)", (int) m->up_busy, (int) m->up_has_work, (int) m->up_go, m->up_list.size(),
++        (int) m->copy_pending, m->up_budget, m->max_uploads_per_step);
++    if (locked) m->up_mutex.unlock();
++    const int ms = m->main_state.load();
++    fprintf(stderr, "  main thread: observe() state %d (0 outside, 1 waits for the uploader, 2 waits for the copies, 3 bookkeeping)%s\n",
++        ms, ms ? "" : " - outside: compute graph running or llama busy elsewhere");
++    fflush(stderr);
++}
++
++static void zc_watchdog(ggml_cuda_moe_zc * m) {
++    const int64_t limit = (int64_t) m->watchdog_s * 1000000000LL;
++    std::vector<uint32_t> pend(m->n_layer, 0);
++    std::vector<int64_t> since(m->n_layer, 0);
++    bool reported = false;
++    for (;;) {
++        {
++            std::unique_lock<std::mutex> lock(m->wd_mutex);
++            if (m->wd_cv.wait_for(lock, std::chrono::seconds(1), [m] { return m->stop.load(); })) return;
++        }
++        const int64_t now = zc_now_ns();
++        int64_t worst = 0, worst_mail = 0;
++        const char * why = nullptr;
++        for (int il = 0; il < m->n_layer; ++il) {
++            const zc_mailbox * b = m->mb(il);
++            const uint32_t req = b->req;
++            if (req == b->done) { pend[il] = 0; continue; }
++            if (pend[il] != req) { pend[il] = req; since[il] = now; continue; }
++            worst_mail = std::max(worst_mail, now - since[il]);
++            if (now - since[il] > worst) { worst = now - since[il]; why = "a CPU expert request is not answered"; }
++        }
++        const int ms = m->main_state.load();
++        if (ms != 0 && now - m->main_since_ns.load() > worst) { worst = now - m->main_since_ns.load(); why = "observe() does not return"; }
++#ifdef _WIN32
++        // Hang guard (DECISIONS D11a): a CPU job takes well under a millisecond. A request waiting a second or
++        // more means a worker does not get its processor: the thread waiting for the GPU in the CUDA driver
++        // runs at a higher dynamic priority (21 was seen) on the one logical processor the worker is pinned to,
++        // and spins there until the CPU job is done, which needs that worker. Let the workers run on any
++        // P-core from now on (soft affinity, ~2% slower) - this resolved the observed hang at once.
++        if (!m->soft_affinity && worst_mail > 1000000000LL) {
++            for (int i = 0; i < (int) m->workers.size(); ++i) {
++                zc_set_affinity((HANDLE) m->workers[i].native_handle(), i, true);
++            }
++            m->soft_affinity = true;
++            fprintf(stderr, "moe_zc: a CPU expert request waited %.1f s: a worker does not get its processor; "
++                "the workers may run on any P-core from now on (hang guard, DECISIONS D11a)\n", worst_mail / 1e9);
++            fflush(stderr);
++        }
++#endif
++        if (worst > limit) {
++            if (!reported) zc_dump_state(m, why, worst / 1e9);
++            reported = true;
++        } else {
++            reported = false;
++        }
++    }
++}
++
+ // ------------------------------------------------------------------ GPU side of the mailbox
+ 
+ static __global__ void k_zc_signal(zc_mailbox * b, uint32_t * seq, uint32_t n_tokens) {
+@@ -754,10 +899,14 @@ static void zc_finalize(ggml_cuda_moe_zc * m) {
+     CUDA_CHECK(cudaMallocHost((void **) &m->h_pf_ids, sizeof(int32_t) * m->n_layer * ZC_PF_TOKENS * m->n_used));
+     m->pf_n.assign(m->n_layer, 0);
+     ggml_cpu_init();
++    m->leader_seen.reset(new std::atomic<uint32_t>[m->n_layer]);
++    for (int il = 0; il < m->n_layer; ++il) m->leader_seen[il].store(0);
++    m->thr.reset(new ggml_cuda_moe_zc::zc_thr_state[m->n_threads]);
+     for (int i = 0; i < m->n_threads; ++i) {
+         m->workers.emplace_back(zc_worker, m, i);
+     }
+     m->uploader = std::thread(zc_uploader, m);
++    if (m->watchdog_s > 0) m->watchdog = std::thread(zc_watchdog, m);
+     m->tables_ready = true;
+ }
+ 
+@@ -780,6 +929,7 @@ ggml_cuda_moe_zc * ggml_cuda_moe_zc_create(int device, int n_layer, int n_expert
+     m->up_budget = std::min(m->up_budget, m->max_uploads_per_step);
+     if (const char * s = getenv("LLAMA_MOE_ZC_VERBOSE"))     m->verbose = atoi(s) != 0;
+     if (const char * s = getenv("LLAMA_MOE_ZC_THREADS"))     m->n_threads = std::max(1, atoi(s));
++    if (const char * s = getenv("LLAMA_MOE_ZC_WATCHDOG_S"))  m->watchdog_s = std::max(0, atoi(s));
+     if (n_slots > 0) {
+         CUDA_CHECK(cudaMalloc((void **) &m->d_slots, (size_t) n_slots * m->slot_bytes));
+     }
+@@ -885,14 +1035,18 @@ void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_t
+ 
+     // 1. uploads started during the last step are complete: they become visible now
+     const int64_t t_wait0 = zc_now_ns();
++    m->main_since_ns.store(t_wait0, std::memory_order_relaxed);
++    m->main_state.store(1, std::memory_order_relaxed);
+     {
+         std::unique_lock<std::mutex> lock(m->up_mutex);
+         m->up_cv.wait(lock, [m] { return !m->up_busy; });
+     }
++    m->main_state.store(2, std::memory_order_relaxed);
+     if (m->copy_pending) {
+         CUDA_CHECK(cudaEventSynchronize(m->copy_done));
+         m->copy_pending = false;
+     }
++    m->main_state.store(3, std::memory_order_relaxed);
+     if (n_tokens <= ZC_MAX_TOKENS) {
+         // adapt the upload budget: waiting here means last step's copies were longer than the step
+         const int64_t waited = zc_now_ns() - t_wait0;
+@@ -1004,6 +1158,7 @@ void ggml_cuda_moe_zc_observe(ggml_cuda_moe_zc * m, const int32_t * ids, int n_t
+     const size_t n = m->tensors.size() * (size_t) m->n_expert;
+     CUDA_CHECK(cudaMemcpy((void *) m->d_tables, m->h_tables, n * sizeof(void *), cudaMemcpyHostToDevice));
+     std::atomic_thread_fence(std::memory_order_release);
++    m->main_state.store(0, std::memory_order_relaxed);
+ 
+     if (m->verbose && m->st_steps % 64 == 0) {
+         GGML_LOG_INFO("moe_zc: steps %lld tokens %lld | VRAM hit %.1f%% | CPU experts/token %.1f (%.1f us/expert) | uploads/step %.1f (budget %d, wait %.2f ms/step)\n",
+@@ -1037,6 +1192,9 @@ void ggml_cuda_moe_zc_free(ggml_cuda_moe_zc * m) {
+     for (auto & w : m->workers) w.join();
+     m->up_cv.notify_all();
+     if (m->uploader.joinable()) m->uploader.join();
++    { std::lock_guard<std::mutex> lock(m->wd_mutex); }
++    m->wd_cv.notify_all();
++    if (m->watchdog.joinable()) m->watchdog.join();
+     {
+         std::lock_guard<std::mutex> lock(g_zc_mutex);
+         for (auto & z : m->tensors) g_zc_reg.erase(z.t->data);
+-- 
+2.45.2.windows.1
+
