@@ -1,0 +1,122 @@
+From 085fcb5ddceabeea0bcfe543b6bfe562ecadc002 Mon Sep 17 00:00:00 2001
+From: Claude Agent <noreply@anthropic.com>
+Date: Sun, 8 Nov 2026 04:43:58 +0300
+Subject: [PATCH] moe-zc: prefill copies zero the heads of unused experts and a
+ tail after the tensor (mmq reads rows up to a multiple of 512 values; Gemma 4
+ rows 2816/704 read into the next expert, NaN from stale pool memory)
+
+---
+ ggml/src/ggml-cuda/common.cuh |  2 ++
+ ggml/src/ggml-cuda/mmq.cu     |  4 ++--
+ ggml/src/ggml-cuda/moe-zc.cu  | 38 +++++++++++++++++++++++++++++------
+ 3 files changed, 36 insertions(+), 8 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/common.cuh b/ggml/src/ggml-cuda/common.cuh
+index d03655d95..611011247 100644
+--- a/ggml/src/ggml-cuda/common.cuh
++++ b/ggml/src/ggml-cuda/common.cuh
+@@ -1614,6 +1614,8 @@ bool ggml_cuda_moe_zc_lookup(const void * data, ggml_cuda_moe_zc ** m, int * ti)
+ const void * const * ggml_cuda_moe_zc_table(ggml_cuda_moe_zc * m, int ti);
+ int  ggml_cuda_moe_zc_max_tokens();
+ void ggml_cuda_moe_zc_to_vram(ggml_cuda_moe_zc * m, int ti, void * dst, const int32_t * ids, size_t ids_nb1, int n_tokens, cudaStream_t stream);
++// size of the VRAM copy buffer for to_vram: the tensor plus a zeroed tail that kernels may read past the last row
++size_t ggml_cuda_moe_zc_vram_bytes(ggml_cuda_moe_zc * m, int ti);
+ void ggml_cuda_moe_zc_send(ggml_cuda_moe_zc * m, int ti, const float * x, size_t x_nb_token,
+         const int32_t * ids, size_t ids_nb_token, int n_tokens, cudaStream_t stream);
+ void ggml_cuda_moe_zc_recv(ggml_cuda_moe_zc * m, int ti, float * dst, size_t dst_nb1, size_t dst_nb2,
+diff --git a/ggml/src/ggml-cuda/mmq.cu b/ggml/src/ggml-cuda/mmq.cu
+index 02eeac315..11038c1eb 100644
+--- a/ggml/src/ggml-cuda/mmq.cu
++++ b/ggml/src/ggml-cuda/mmq.cu
+@@ -178,14 +178,14 @@ void ggml_cuda_mul_mat_q(
+         ggml_cuda_moe_zc * zm = nullptr;
+         int zt = -1;
+         if (ggml_cuda_moe_zc_lookup(src0->data, &zm, &zt)) {
+-            zc_buf0.alloc(ggml_nbytes(src0));
++            zc_buf0.alloc(ggml_cuda_moe_zc_vram_bytes(zm, zt));
+             ggml_cuda_moe_zc_to_vram(zm, zt, zc_buf0.get(), (const int32_t *) ids->data, ids->nb[1], (int) ids->ne[1], ctx.stream());
+             zc_src0 = *src0;
+             zc_src0.data = zc_buf0.get();
+             src0 = &zc_src0;
+         }
+         if (fusion && fusion->gate && ggml_cuda_moe_zc_lookup(fusion->gate->data, &zm, &zt)) {
+-            zc_buf1.alloc(ggml_nbytes(fusion->gate));
++            zc_buf1.alloc(ggml_cuda_moe_zc_vram_bytes(zm, zt));
+             ggml_cuda_moe_zc_to_vram(zm, zt, zc_buf1.get(), (const int32_t *) ids->data, ids->nb[1], (int) ids->ne[1], ctx.stream());
+             zc_gate = *fusion->gate;
+             zc_gate.data = zc_buf1.get();
+diff --git a/ggml/src/ggml-cuda/moe-zc.cu b/ggml/src/ggml-cuda/moe-zc.cu
+index 69829341e..1a1da88c7 100644
+--- a/ggml/src/ggml-cuda/moe-zc.cu
++++ b/ggml/src/ggml-cuda/moe-zc.cu
+@@ -550,9 +550,13 @@ static __global__ void k_zc_recv(const zc_mailbox * b, const uint32_t * seq, con
+ }
+ 
+ // copies the experts used by a batch into dst (laid out like the original tensor),
+-// from their VRAM slot when cached, otherwise straight from host RAM
+-static __global__ void k_zc_gather(char * dst, const char * host, size_t stride, size_t bytes, const void * const * table,
+-        const int32_t * ids, int n_used, int ids_stride, int n_tokens) {
++// from their VRAM slot when cached, otherwise straight from host RAM (copy == false: no copies, see below).
++// The first head_bytes of every expert NOT used are zeroed: mmq reads each row up to a multiple of 512
++// values (MATRIX_ROW_PADDING) and multiplies the excess by zero padding of the activations. For rows whose
++// length is not a multiple of 512 (Gemma 4: 2816 and 704) the last row of an expert reads into the next
++// expert; stale pool memory there may hold NaN/Inf bit patterns, and NaN * 0 = NaN.
++static __global__ void k_zc_gather(char * dst, const char * host, size_t stride, size_t bytes, size_t head_bytes,
++        const void * const * table, const int32_t * ids, int n_used, int ids_stride, int n_tokens, bool copy) {
+     const int e = blockIdx.x;
+     __shared__ int used;
+     if (threadIdx.x == 0) used = 0;
+@@ -561,13 +565,29 @@ static __global__ void k_zc_gather(char * dst, const char * host, size_t stride,
+         if (ids[(i / n_used) * ids_stride + i % n_used] == e) used = 1;
+     }
+     __syncthreads();
+-    if (!used) return;
+-    const int4 * src = (const int4 *) (table[e] ? (const char *) table[e] : host + (size_t) e * stride);
+     int4 * d = (int4 *) (dst + (size_t) e * stride);
++    if (!used) {
++        for (size_t i = (size_t) blockIdx.y * blockDim.x + threadIdx.x; i < head_bytes / 16; i += (size_t) gridDim.y * blockDim.x) {
++            d[i] = make_int4(0, 0, 0, 0);
++        }
++        return;
++    }
++    if (!copy) return;
++    const int4 * src = (const int4 *) (table[e] ? (const char *) table[e] : host + (size_t) e * stride);
+     const size_t n = bytes / 16;
+     for (size_t i = (size_t) blockIdx.y * blockDim.x + threadIdx.x; i < n; i += (size_t) gridDim.y * blockDim.x) d[i] = src[i];
+ }
+ 
++static size_t zc_head_bytes(const zc_tensor & z) {
++    // over-read of one row is < 512 values; twice that, 16-byte aligned, capped by the expert stride
++    return std::min(GGML_PAD(ggml_row_size(z.t->type, 1024), 16), z.expert_stride - z.expert_stride % 16);
++}
++
++size_t ggml_cuda_moe_zc_vram_bytes(ggml_cuda_moe_zc * m, int ti) {
++    const zc_tensor & z = m->tensors[ti];
++    return ggml_nbytes(z.t) + GGML_PAD(ggml_row_size(z.t->type, 1024), 16);
++}
++
+ // ------------------------------------------------------------------ hooks used by mmvq.cu / mmq.cu
+ 
+ // Prompt processing (large batches) runs the expert matmuls on a VRAM copy of the weight tensor.
+@@ -584,11 +604,17 @@ void ggml_cuda_moe_zc_to_vram(ggml_cuda_moe_zc * m, int ti, void * dst, const in
+     }
+     const void * const * table = ggml_cuda_moe_zc_table(m, ti);
+     GGML_ASSERT(z.expert_bytes % 16 == 0 && z.expert_stride % 16 == 0);
++    // the zeroed tail after the last expert (see k_zc_gather)
++    const size_t tail = ggml_cuda_moe_zc_vram_bytes(m, ti) - ggml_nbytes(z.t);
++    CUDA_CHECK(cudaMemsetAsync((char *) dst + ggml_nbytes(z.t), 0, tail, stream));
+     if (n_tokens <= 64) {
+         k_zc_gather<<<dim3(m->n_expert, 4), 256, 0, stream>>>((char *) dst, (const char *) z.t->data, z.expert_stride, z.expert_bytes,
+-            table, ids, m->n_used, (int) (ids_nb1 / sizeof(int32_t)), n_tokens);
++            zc_head_bytes(z), table, ids, m->n_used, (int) (ids_nb1 / sizeof(int32_t)), n_tokens, true);
+         return;
+     }
++    // large batches: zero the heads of the unused experts here, the used ones are copied by the DMA batch below
++    k_zc_gather<<<dim3(m->n_expert, 1), 256, 0, stream>>>((char *) dst, (const char *) z.t->data, z.expert_stride, z.expert_bytes,
++        zc_head_bytes(z), table, ids, m->n_used, (int) (ids_nb1 / sizeof(int32_t)), n_tokens, false);
+     // which experts does this batch use? Even 512 tokens leave a part of the experts unused (routing is
+     // skewed), and copying only the used ones saves ~25% of the PCIe traffic. The ids are produced by the
+     // GPU just before: wait for them (one sync per call; prompt processing is not captured in a CUDA graph).
+-- 
+2.45.2.windows.1
+

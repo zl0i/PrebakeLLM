@@ -1,0 +1,4 @@
+[
+ {"name": "llama.cpp cache7500+mtp3", "server": "", "args": ["-ngl", "99", "-cmoe", "--moe-cache-mib", "7500", "-lm", "none", "-t", "8", "-md", "models/mtp-Qwen3.6-35B-A3B-Q4_0.gguf", "--spec-type", "draft-mtp", "--spec-draft-n-max", "3"]},
+ {"name": "llama.cpp cache7500+mtp2", "server": "", "args": ["-ngl", "99", "-cmoe", "--moe-cache-mib", "7500", "-lm", "none", "-t", "8", "-md", "models/mtp-Qwen3.6-35B-A3B-Q4_0.gguf", "--spec-type", "draft-mtp", "--spec-draft-n-max", "2"]}
+]

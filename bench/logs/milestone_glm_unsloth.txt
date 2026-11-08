@@ -1,0 +1,15 @@
+round 0 llama.cpp best (cache8500 t6)      short   71.2  long   56.8  pp_long  780.3  acc 0.00  CPU  5.6%  GPU 115.0 W  20261108-035106_ms_GLM-4.7-Flas_llama_cpp_best__cache8500_t6__r0.jsonl
+round 0 ik_llama.cpp best (cache8500 t8)   short   56.0  long   40.9  pp_long   36.0  acc 0.00  CPU  6.2%  GPU  72.6 W  20261108-035217_ms_GLM-4.7-Flas_ik_llama_cpp_best__cache8500_t8__r0.jsonl
+round 0 ours (aic build)                   short   86.7  long   71.2  pp_long  760.1  acc 0.00  CPU 28.2%  GPU 122.1 W  20261108-040045_ms_GLM-4.7-Flas_ours__aic_build__r0.jsonl
+round 1 llama.cpp best (cache8500 t6)      short   63.9  long   53.7  pp_long  625.5  acc 0.00  CPU  5.6%  GPU  75.8 W  20261108-040145_ms_GLM-4.7-Flas_llama_cpp_best__cache8500_t6__r1.jsonl
+round 1 ik_llama.cpp best (cache8500 t8)   short   55.4  long   40.5  pp_long   35.9  acc 0.00  CPU  6.6%  GPU  70.5 W  20261108-040259_ms_GLM-4.7-Flas_ik_llama_cpp_best__cache8500_t8__r1.jsonl
+round 1 ours (aic build)                   short   86.4  long   71.7  pp_long  760.5  acc 0.00  CPU 27.9%  GPU 122.1 W  20261108-041129_ms_GLM-4.7-Flas_ours__aic_build__r1.jsonl
+
+model: GLM-4.7-Flash-Q4_K_M.gguf
+| Contender | short, tok/s | long 17K, tok/s | prompt 17K, tok/s | draft accepted | CPU busy | GPU power | GPU J/token (short) | short/long per round |
+|---|---|---|---|---|---|---|---|---|
+| llama.cpp best (cache8500 t6) | 67.5 | 55.3 | 703 | nan% | 6% | 95 W | 1.41 | 71.2/56.8, 63.9/53.7 |
+| ik_llama.cpp best (cache8500 t8) | 55.7 | 40.7 | 36 | nan% | 6% | 72 W | 1.29 | 56.0/40.9, 55.4/40.5 |
+| ours (aic build) | 86.6 | 71.4 | 760 | nan% | 28% | 122 W | 1.41 | 86.7/71.2, 86.4/71.7 |
+
+raw: D:\Projects\Work\ai\bench\milestone_results_GLM-4.7-Flash-Q4_K_M.json

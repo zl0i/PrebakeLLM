@@ -133,6 +133,14 @@ STAGES = {
         ("ik_cache9500", "-ngl 99 -cmoe --moe-cache-mib 9500 -nmm -t 8"),
         ("ik_cache9000_t6", "-ngl 99 -cmoe --moe-cache-mib 9000 -nmm -t 6"),
     ],
+    # Qwen3.6 after closing background apps (more free VRAM): does llama.cpp also gain from a bigger cache?
+    "qwen_morevram": [
+        ("cache7000_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 7000 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("cache7000_mtp3", f"-ngl 99 -cmoe --moe-cache-mib 7000 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
+        ("cache7500_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 7500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+        ("cache7500_mtp3", f"-ngl 99 -cmoe --moe-cache-mib 7500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 3"),
+        ("cache6500_mtp2", f"-ngl 99 -cmoe --moe-cache-mib 6500 -lm none -t 8 -md {MTP} --spec-type draft-mtp --spec-draft-n-max 2"),
+    ],
     # the larger caches the first passes pointed to (GLM unsloth file is 0.5 GB smaller than meshllm's)
     "glm_nodraft2": [
         ("cache9000_t6", "-ngl 99 -cmoe --moe-cache-mib 9000 -lm none -t 6"),

@@ -1,0 +1,18 @@
+round 0 llama.cpp cache6500+mtp2           short   98.0  long   98.0  pp_long  612.7  acc 0.79  CPU  6.2%  GPU  76.9 W  20261108-041231_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_r0.jsonl
+round 0 llama.cpp cache6500+mtp2 t6        short   97.6  long  101.0  pp_long  611.5  acc 0.79  CPU  6.0%  GPU  76.5 W  20261108-041343_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_t6_r0.jsonl
+round 0 llama.cpp cache6500+mtp3           short   98.1  long  101.1  pp_long  617.4  acc 0.70  CPU  6.3%  GPU  77.5 W  20261108-041448_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp3_r0.jsonl
+round 0 ours (aic build)                   short  123.1  long  136.5  pp_long  821.2  acc 0.80  CPU 27.5%  GPU  82.0 W  20261108-041552_ms_Qwen3.6-35B-_ours__aic_build__r0.jsonl
+round 1 llama.cpp cache6500+mtp2           short   98.4  long  100.8  pp_long  615.5  acc 0.79  CPU  5.9%  GPU  77.2 W  20261108-041645_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_r1.jsonl
+round 1 llama.cpp cache6500+mtp2 t6        short   98.0  long  101.6  pp_long  610.2  acc 0.79  CPU  6.0%  GPU  76.7 W  20261108-041749_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp2_t6_r1.jsonl
+round 1 llama.cpp cache6500+mtp3           short   98.1  long  101.6  pp_long  617.7  acc 0.70  CPU  6.1%  GPU  77.3 W  20261108-041854_ms_Qwen3.6-35B-_llama_cpp_cache6500_mtp3_r1.jsonl
+round 1 ours (aic build)                   short  121.7  long  135.5  pp_long  821.5  acc 0.80  CPU 27.5%  GPU  81.1 W  20261108-041958_ms_Qwen3.6-35B-_ours__aic_build__r1.jsonl
+
+model: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+| Contender | short, tok/s | long 17K, tok/s | prompt 17K, tok/s | draft accepted | CPU busy | GPU power | GPU J/token (short) | short/long per round |
+|---|---|---|---|---|---|---|---|---|
+| llama.cpp cache6500+mtp2 | 98.2 | 99.4 | 614 | 79% | 6% | 77 W | 0.78 | 98.0/98.0, 98.4/100.8 |
+| llama.cpp cache6500+mtp2 t6 | 97.8 | 101.3 | 611 | 79% | 6% | 77 W | 0.78 | 97.6/101.0, 98.0/101.6 |
+| llama.cpp cache6500+mtp3 | 98.1 | 101.4 | 618 | 70% | 6% | 77 W | 0.79 | 98.1/101.1, 98.1/101.6 |
+| ours (aic build) | 122.4 | 136.0 | 821 | 80% | 27% | 82 W | 0.67 | 123.1/136.5, 121.7/135.5 |
+
+raw: D:\Projects\Work\ai\bench\milestone_results_Qwen3.6-35B-A3B-UD-Q4_K_M.json
